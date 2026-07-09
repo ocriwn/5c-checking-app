@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: 5c-scoring-app
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DB_PATH
+        value: /data/5c.db
+      - key: FLASK_DEBUG
+        value: "0"
+    disk:
+      name: 5c-data
+      mountPath: /data
+      sizeGB: 1

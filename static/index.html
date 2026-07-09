@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>5C 卓越旅程</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#0f2a4a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="卓越旅程">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">Ralph Lauren｜5C 卓越旅程</div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-view="score">打分</button>
+    <button class="tab-btn" data-view="history">歷史記錄</button>
+    <button class="tab-btn" data-view="analytics">資料分析</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ==================== 打分 ==================== -->
+<section id="view-score" class="view active">
+  <form id="score-form">
+    <div class="card">
+      <div class="grid-fields">
+        <label>日期
+          <input type="date" id="f-date" required>
+        </label>
+        <label>門店
+          <div class="inline-add">
+            <select id="f-store" required></select>
+            <button type="button" id="btn-add-store" class="btn-ghost">＋新增門店</button>
+          </div>
+          <div class="inline-add" id="new-store-row" hidden>
+            <input type="text" id="new-store-name" placeholder="新門店名稱">
+            <button type="button" id="btn-confirm-store" class="btn-ghost">確認</button>
+            <button type="button" id="btn-cancel-store" class="btn-ghost">取消</button>
+          </div>
+        </label>
+        <label>員工姓名 (SA)
+          <input type="text" id="f-employee" list="employee-list" required placeholder="輸入員工姓名">
+          <datalist id="employee-list"></datalist>
+        </label>
+        <label>Role Play 考核人
+          <input type="text" id="f-evaluator" list="evaluator-list" required placeholder="輸入考核人姓名">
+          <datalist id="evaluator-list"></datalist>
+        </label>
+      </div>
+
+      <div class="feelings">
+        <div class="feelings-label">總體感受（可複選）</div>
+        <div id="feelings-options" class="feelings-options"></div>
+      </div>
+    </div>
+
+    <div id="categories-container"></div>
+
+    <div class="card overall-feedback">
+      <label>整體反饋建議
+        <textarea id="f-overall-feedback" rows="3" placeholder="給員工的整體反饋與建議"></textarea>
+      </label>
+    </div>
+
+    <div id="submit-msg" class="submit-msg"></div>
+  </form>
+</section>
+
+<!-- ==================== 歷史記錄 ==================== -->
+<section id="view-history" class="view">
+  <div class="card filters">
+    <label>門店
+      <select id="h-store"><option value="">全部門店</option></select>
+    </label>
+    <label>員工
+      <select id="h-employee"><option value="">全部員工</option></select>
+    </label>
+    <label>起始日期 <input type="date" id="h-date-from"></label>
+    <label>結束日期 <input type="date" id="h-date-to"></label>
+    <button type="button" id="btn-filter-history" class="btn-primary">篩選</button>
+  </div>
+  <div class="card">
+    <table class="data-table" id="history-table">
+      <thead>
+        <tr><th>日期</th><th>門店</th><th>員工</th><th>考核人</th><th>總分</th><th>等級</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div id="history-detail" class="card detail-panel" hidden></div>
+</section>
+
+<!-- ==================== 資料分析 ==================== -->
+<section id="view-analytics" class="view">
+  <div class="card filters">
+    <label>門店範圍
+      <select id="a-store"><option value="">全店鋪（全部門店）</option></select>
+    </label>
+    <button type="button" id="btn-refresh-analytics" class="btn-primary">重新整理分析</button>
+  </div>
+
+  <div class="highlight-cards">
+    <div class="card highlight-card highlight-good">
+      <div class="highlight-label">💪 最強環節</div>
+      <div class="highlight-value" id="highlight-best">－</div>
+    </div>
+    <div class="card highlight-card highlight-focus">
+      <div class="highlight-label">🎯 成長機會</div>
+      <div class="highlight-value" id="highlight-worst">－</div>
+    </div>
+  </div>
+
+  <div class="analytics-grid">
+    <div class="card">
+      <h3>5C 各維度表現總覽</h3>
+      <canvas id="chart-category"></canvas>
+      <p class="hint">達成率 = 該維度實際得分 ÷ 該維度滿分</p>
+    </div>
+    <div class="stacked-cards">
+      <div class="card">
+        <h3>表現亮點 Top 10</h3>
+        <table class="data-table small" id="strong-items-table">
+          <thead><tr><th>維度</th><th>行為項目</th><th>達成率</th><th>樣本數</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>成長機會 Top 10</h3>
+        <table class="data-table small" id="weak-items-table">
+          <thead><tr><th>維度</th><th>行為項目</th><th>達成率</th><th>樣本數</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>個人改善追蹤</h3>
+    <label>選擇員工
+      <select id="a-employee"><option value="">請選擇員工</option></select>
+    </label>
+    <canvas id="chart-employee-trend"></canvas>
+    <table class="data-table small" id="employee-trend-table">
+      <thead><tr><th>日期</th><th>總分</th><th>等級</th><th>CREATE</th><th>CONNECT</th><th>CONVERT</th><th>CONFIRM</th><th>CONTINUE</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
