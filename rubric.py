@@ -91,4 +91,4 @@ def grade_for(score):
         return "優秀"
     if score >= 85:
         return "合格"
-    return "不合格"
+    return "待加強"

@@ -7,11 +7,11 @@ const state = {
 
 const CATEGORY_ORDER = ["CREATE", "CONNECT", "CONVERT", "CONFIRM", "CONTINUE"];
 const CATEGORY_COLORS = {
-  CREATE: "#b08b3f",
-  CONNECT: "#1c3f6e",
-  CONVERT: "#2e7d32",
-  CONFIRM: "#8e44ad",
-  CONTINUE: "#c0392b",
+  CREATE: "#a8823c",
+  CONNECT: "#13233c",
+  CONVERT: "#4b6043",
+  CONFIRM: "#8a4b32",
+  CONTINUE: "#8c6239",
 };
 
 async function api(path, options) {
@@ -113,7 +113,7 @@ function updateTotals() {
   });
   document.getElementById("live-total").textContent = grandTotal;
   const gradeEl = document.getElementById("live-grade");
-  let grade = "不合格";
+  let grade = "待加強";
   if (grandTotal >= 90) grade = "優秀";
   else if (grandTotal >= 85) grade = "合格";
   gradeEl.textContent = grade;

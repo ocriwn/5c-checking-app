@@ -1,15 +1,17 @@
 :root {
-  --rl-navy: #0f2a4a;
-  --rl-navy-light: #1c3f6e;
-  --accent: #b08b3f;
-  --bg: #f4f5f7;
-  --card-bg: #ffffff;
-  --border: #e0e2e6;
-  --text: #1f2530;
-  --muted: #6b7280;
-  --good: #2e7d32;
-  --ok: #b8860b;
-  --bad: #c0392b;
+  --rl-navy: #13233c;
+  --rl-navy-light: #223a5e;
+  --accent: #a8823c;
+  --bg: #f6f2e9;
+  --card-bg: #fffdf9;
+  --border: #e3d8c4;
+  --text: #2b2620;
+  --muted: #79705f;
+  --good: #4b6043;
+  --ok: #a8823c;
+  --focus: #8a4b32;
+  --font-serif: Georgia, "Noto Serif TC", "PMingLiU", serif;
+  --font-sans: "PingFang TC", "Microsoft JhengHei", "Helvetica Neue", Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -18,7 +20,7 @@
 
 body {
   margin: 0;
-  font-family: "PingFang TC", "Microsoft JhengHei", "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text);
 }
@@ -35,7 +37,7 @@ body {
   z-index: 10;
 }
 
-.brand { font-size: 18px; font-weight: 600; letter-spacing: 0.3px; }
+.brand { font-family: var(--font-serif); font-size: 19px; font-weight: 600; letter-spacing: 0.4px; }
 
 .tabs { display: flex; gap: 8px; }
 
@@ -62,6 +64,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 20px; }
   padding: 18px 20px;
   margin-bottom: 16px;
 }
+.card h3 { font-family: var(--font-serif); font-weight: 600; color: var(--rl-navy); letter-spacing: 0.2px; }
 
 .grid-fields {
   display: grid;
@@ -128,7 +131,7 @@ textarea { resize: vertical; }
   border-bottom: 2px solid var(--rl-navy);
   margin-bottom: 10px;
 }
-.category-header h3 { margin: 0; color: var(--rl-navy); font-size: 16px; }
+.category-header h3 { margin: 0; color: var(--rl-navy); font-size: 16px; font-family: var(--font-serif); }
 .category-header .subtitle { font-size: 12px; color: var(--muted); margin-left: 8px; }
 .category-subtotal { font-size: 14px; font-weight: 600; color: var(--accent); }
 
@@ -169,11 +172,11 @@ textarea { resize: vertical; }
 .btn-submit:hover { filter: brightness(1.08); }
 .grade-優秀 { background: var(--good); }
 .grade-合格 { background: var(--ok); }
-.grade-不合格 { background: var(--bad); }
+.grade-待加強 { background: var(--focus); }
 
 .submit-msg { text-align: center; padding: 10px; font-size: 14px; }
 .submit-msg.success { color: var(--good); }
-.submit-msg.error { color: var(--bad); }
+.submit-msg.error { color: var(--focus); }
 
 .filters { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
 
@@ -187,7 +190,7 @@ textarea { resize: vertical; }
 .pill { padding: 2px 10px; border-radius: 20px; color: #fff; font-size: 12px; font-weight: 600; }
 .pill-優秀 { background: var(--good); }
 .pill-合格 { background: var(--ok); }
-.pill-不合格 { background: var(--bad); }
+.pill-待加強 { background: var(--focus); }
 
 .detail-panel h4 { margin-top: 0; }
 .detail-item { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
@@ -202,7 +205,7 @@ textarea { resize: vertical; }
 }
 .highlight-card { margin-bottom: 0; border-left: 5px solid var(--border); }
 .highlight-good { border-left-color: var(--good); }
-.highlight-focus { border-left-color: var(--accent); }
+.highlight-focus { border-left-color: var(--focus); }
 .highlight-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 .highlight-value { font-size: 19px; font-weight: 700; color: var(--text); }
 
