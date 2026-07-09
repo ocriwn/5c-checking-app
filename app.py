@@ -6,6 +6,45 @@ from datetime import datetime
 from flask import Flask, g, jsonify, request, send_from_directory
 
 from rubric import CATEGORIES, ITEM_INDEX, OVERALL_FEELINGS, TOTAL_MAX_SCORE, grade_for
+from translations import (
+    CATEGORY_I18N,
+    GRADE_LABELS,
+    ITEM_I18N,
+    LANGUAGES,
+    OVERALL_FEELINGS_I18N,
+    UI_STRINGS,
+    norm_lang,
+)
+
+
+def localized_categories(lang):
+    lang = norm_lang(lang)
+    cats = []
+    for cat in CATEGORIES:
+        cat_i18n = CATEGORY_I18N[cat["key"]][lang]
+        items = []
+        for item in cat["items"]:
+            text = item["text"] if lang == "zh-TW" else ITEM_I18N.get(item["id"], {}).get(lang, item["text"])
+            items.append({"id": item["id"], "max": item["max"], "text": text})
+        cats.append(
+            {
+                "key": cat["key"],
+                "name": cat_i18n["name"],
+                "subtitle": cat_i18n["subtitle"],
+                "items": items,
+            }
+        )
+    return cats
+
+
+def localized_item_text(item_id, lang):
+    lang = norm_lang(lang)
+    category, rubric_item = ITEM_INDEX.get(item_id, (None, None))
+    if not rubric_item:
+        return None
+    if lang == "zh-TW":
+        return rubric_item["text"]
+    return ITEM_I18N.get(item_id, {}).get(lang, rubric_item["text"])
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "data", "5c.db"))
@@ -75,11 +114,25 @@ def index():
 
 @app.route("/api/rubric")
 def api_rubric():
+    lang = norm_lang(request.args.get("lang"))
     return jsonify(
         {
-            "categories": CATEGORIES,
-            "overallFeelings": OVERALL_FEELINGS,
+            "categories": localized_categories(lang),
+            "overallFeelings": OVERALL_FEELINGS_I18N[lang],
             "totalMaxScore": TOTAL_MAX_SCORE,
+        }
+    )
+
+
+@app.route("/api/i18n")
+def api_i18n():
+    lang = norm_lang(request.args.get("lang"))
+    return jsonify(
+        {
+            "lang": lang,
+            "languages": LANGUAGES,
+            "ui": UI_STRINGS[lang],
+            "gradeLabels": GRADE_LABELS[lang],
         }
     )
 
@@ -90,7 +143,7 @@ def api_stores():
     if request.method == "POST":
         name = (request.json or {}).get("name", "").strip()
         if not name:
-            return jsonify({"error": "門店名稱不可為空"}), 400
+            return jsonify({"error": UI_STRINGS["zh-TW"]["err_store_name_required"], "code": "store_name_required"}), 400
         try:
             db.execute("INSERT INTO stores (name) VALUES (?)", (name,))
             db.commit()
@@ -137,9 +190,9 @@ def api_evaluations():
         items = payload.get("items") or {}
 
         if not eval_date or not store_id or not employee_name or not evaluator_name:
-            return jsonify({"error": "日期、門店、員工姓名、考核人為必填"}), 400
+            return jsonify({"error": UI_STRINGS["zh-TW"]["err_missing_fields"], "code": "missing_fields"}), 400
         if not items:
-            return jsonify({"error": "請至少完成一項評分"}), 400
+            return jsonify({"error": UI_STRINGS["zh-TW"]["err_no_items"], "code": "no_items"}), 400
 
         total_score = 0.0
         item_rows = []
@@ -243,6 +296,7 @@ def api_category_breakdown():
     db = get_db()
     store_id = request.args.get("store_id")
     employee_name = request.args.get("employee_name")
+    lang = norm_lang(request.args.get("lang"))
 
     query = """
         SELECT ei.category, SUM(ei.actual_score) AS actual, SUM(ei.max_score) AS possible,
@@ -266,7 +320,7 @@ def api_category_breakdown():
     result = []
     for key in order:
         r = by_cat.get(key)
-        cat_name = next(c["name"] for c in CATEGORIES if c["key"] == key)
+        cat_name = CATEGORY_I18N[key][lang]["name"]
         if r and r["possible"]:
             pct = round(100 * r["actual"] / r["possible"], 1)
         else:
@@ -287,6 +341,7 @@ def api_category_breakdown():
 def api_item_breakdown():
     db = get_db()
     store_id = request.args.get("store_id")
+    lang = norm_lang(request.args.get("lang"))
 
     query = """
         SELECT ei.item_id, ei.category, SUM(ei.actual_score) AS actual, SUM(ei.max_score) AS possible,
@@ -312,7 +367,7 @@ def api_item_breakdown():
             {
                 "item_id": r["item_id"],
                 "category": category,
-                "text": rubric_item["text"],
+                "text": localized_item_text(r["item_id"], lang),
                 "pct": pct,
                 "n": r["n"],
             }

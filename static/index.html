@@ -17,12 +17,24 @@
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">Ralph Lauren｜5C 卓越旅程</div>
-  <nav class="tabs">
-    <button class="tab-btn active" data-view="score">打分</button>
-    <button class="tab-btn" data-view="history">歷史記錄</button>
-    <button class="tab-btn" data-view="analytics">資料分析</button>
-  </nav>
+  <div class="brand">Ralph Lauren｜<span data-i18n="brand_title"></span></div>
+  <div class="topbar-right">
+    <nav class="tabs">
+      <button class="tab-btn active" data-view="score" data-i18n="tab_score"></button>
+      <button class="tab-btn" data-view="history" data-i18n="tab_history"></button>
+      <button class="tab-btn" data-view="analytics" data-i18n="tab_analytics"></button>
+    </nav>
+    <div class="lang-switcher">
+      <button type="button" id="btn-lang" class="lang-btn" aria-label="Language">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="12" cy="12" r="9"></circle>
+          <ellipse cx="12" cy="12" rx="4" ry="9"></ellipse>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+        </svg>
+      </button>
+      <div id="lang-menu" class="lang-menu" hidden></div>
+    </div>
+  </div>
 </header>
 
 <main>
@@ -32,32 +44,32 @@
   <form id="score-form">
     <div class="card">
       <div class="grid-fields">
-        <label>日期
+        <label><span data-i18n="field_date"></span>
           <input type="date" id="f-date" required>
         </label>
-        <label>門店
+        <label><span data-i18n="field_store"></span>
           <div class="inline-add">
             <select id="f-store" required></select>
-            <button type="button" id="btn-add-store" class="btn-ghost">＋新增門店</button>
+            <button type="button" id="btn-add-store" class="btn-ghost" data-i18n="btn_add_store"></button>
           </div>
           <div class="inline-add" id="new-store-row" hidden>
-            <input type="text" id="new-store-name" placeholder="新門店名稱">
-            <button type="button" id="btn-confirm-store" class="btn-ghost">確認</button>
-            <button type="button" id="btn-cancel-store" class="btn-ghost">取消</button>
+            <input type="text" id="new-store-name" data-i18n-placeholder="placeholder_new_store">
+            <button type="button" id="btn-confirm-store" class="btn-ghost" data-i18n="btn_confirm_store"></button>
+            <button type="button" id="btn-cancel-store" class="btn-ghost" data-i18n="btn_cancel_store"></button>
           </div>
         </label>
-        <label>員工姓名 (SA)
-          <input type="text" id="f-employee" list="employee-list" required placeholder="輸入員工姓名">
+        <label><span data-i18n="field_employee"></span>
+          <input type="text" id="f-employee" list="employee-list" required data-i18n-placeholder="placeholder_employee">
           <datalist id="employee-list"></datalist>
         </label>
-        <label>Role Play 考核人
-          <input type="text" id="f-evaluator" list="evaluator-list" required placeholder="輸入考核人姓名">
+        <label><span data-i18n="field_evaluator"></span>
+          <input type="text" id="f-evaluator" list="evaluator-list" required data-i18n-placeholder="placeholder_evaluator">
           <datalist id="evaluator-list"></datalist>
         </label>
       </div>
 
       <div class="feelings">
-        <div class="feelings-label">總體感受（可複選）</div>
+        <div class="feelings-label" data-i18n="feelings_label"></div>
         <div id="feelings-options" class="feelings-options"></div>
       </div>
     </div>
@@ -65,8 +77,8 @@
     <div id="categories-container"></div>
 
     <div class="card overall-feedback">
-      <label>整體反饋建議
-        <textarea id="f-overall-feedback" rows="3" placeholder="給員工的整體反饋與建議"></textarea>
+      <label><span data-i18n="field_overall_feedback"></span>
+        <textarea id="f-overall-feedback" rows="3" data-i18n-placeholder="placeholder_overall_feedback"></textarea>
       </label>
     </div>
 
@@ -77,20 +89,23 @@
 <!-- ==================== 歷史記錄 ==================== -->
 <section id="view-history" class="view">
   <div class="card filters">
-    <label>門店
-      <select id="h-store"><option value="">全部門店</option></select>
+    <label><span data-i18n="field_store"></span>
+      <select id="h-store"><option value="" data-i18n="filter_store_all"></option></select>
     </label>
-    <label>員工
-      <select id="h-employee"><option value="">全部員工</option></select>
+    <label><span data-i18n="filter_employee"></span>
+      <select id="h-employee"><option value="" data-i18n="filter_employee_all"></option></select>
     </label>
-    <label>起始日期 <input type="date" id="h-date-from"></label>
-    <label>結束日期 <input type="date" id="h-date-to"></label>
-    <button type="button" id="btn-filter-history" class="btn-primary">篩選</button>
+    <label><span data-i18n="filter_date_from"></span> <input type="date" id="h-date-from"></label>
+    <label><span data-i18n="filter_date_to"></span> <input type="date" id="h-date-to"></label>
+    <button type="button" id="btn-filter-history" class="btn-primary" data-i18n="btn_filter"></button>
   </div>
   <div class="card">
     <table class="data-table" id="history-table">
       <thead>
-        <tr><th>日期</th><th>門店</th><th>員工</th><th>考核人</th><th>總分</th><th>等級</th><th></th></tr>
+        <tr>
+          <th data-i18n="th_date"></th><th data-i18n="th_store"></th><th data-i18n="th_employee"></th>
+          <th data-i18n="th_evaluator"></th><th data-i18n="th_total"></th><th data-i18n="th_grade"></th><th></th>
+        </tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -101,41 +116,41 @@
 <!-- ==================== 資料分析 ==================== -->
 <section id="view-analytics" class="view">
   <div class="card filters">
-    <label>門店範圍
-      <select id="a-store"><option value="">全店鋪（全部門店）</option></select>
+    <label><span data-i18n="filter_store_range"></span>
+      <select id="a-store"><option value="" data-i18n="filter_store_range_all"></option></select>
     </label>
-    <button type="button" id="btn-refresh-analytics" class="btn-primary">重新整理分析</button>
+    <button type="button" id="btn-refresh-analytics" class="btn-primary" data-i18n="btn_refresh_analytics"></button>
   </div>
 
   <div class="highlight-cards">
     <div class="card highlight-card highlight-good">
-      <div class="highlight-label">最強環節</div>
+      <div class="highlight-label" data-i18n="highlight_best_label"></div>
       <div class="highlight-value" id="highlight-best">－</div>
     </div>
     <div class="card highlight-card highlight-focus">
-      <div class="highlight-label">成長機會</div>
+      <div class="highlight-label" data-i18n="highlight_worst_label"></div>
       <div class="highlight-value" id="highlight-worst">－</div>
     </div>
   </div>
 
   <div class="analytics-grid">
     <div class="card">
-      <h3>5C 各維度表現總覽</h3>
+      <h3 data-i18n="chart_category_title"></h3>
       <div class="chart-wrap"><canvas id="chart-category"></canvas></div>
-      <p class="hint">達成率 = 該維度實際得分 ÷ 該維度滿分</p>
+      <p class="hint" data-i18n="chart_category_hint"></p>
     </div>
     <div class="stacked-cards">
       <div class="card">
-        <h3>表現亮點 Top 10</h3>
+        <h3 data-i18n="strong_items_title"></h3>
         <table class="data-table small" id="strong-items-table">
-          <thead><tr><th>維度</th><th>行為項目</th><th>達成率</th><th>樣本數</th></tr></thead>
+          <thead><tr><th data-i18n="th_category"></th><th data-i18n="th_item"></th><th data-i18n="th_pct"></th><th data-i18n="th_n"></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
       <div class="card">
-        <h3>成長機會 Top 10</h3>
+        <h3 data-i18n="weak_items_title"></h3>
         <table class="data-table small" id="weak-items-table">
-          <thead><tr><th>維度</th><th>行為項目</th><th>達成率</th><th>樣本數</th></tr></thead>
+          <thead><tr><th data-i18n="th_category"></th><th data-i18n="th_item"></th><th data-i18n="th_pct"></th><th data-i18n="th_n"></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -143,13 +158,18 @@
   </div>
 
   <div class="card">
-    <h3>個人改善追蹤</h3>
-    <label>選擇員工
-      <select id="a-employee"><option value="">請選擇員工</option></select>
+    <h3 data-i18n="employee_trend_title"></h3>
+    <label><span data-i18n="field_select_employee"></span>
+      <select id="a-employee"><option value="" data-i18n="select_employee_placeholder"></option></select>
     </label>
     <div class="chart-wrap"><canvas id="chart-employee-trend"></canvas></div>
     <table class="data-table small" id="employee-trend-table">
-      <thead><tr><th>日期</th><th>總分</th><th>等級</th><th>CREATE</th><th>CONNECT</th><th>CONVERT</th><th>CONFIRM</th><th>CONTINUE</th></tr></thead>
+      <thead>
+        <tr>
+          <th data-i18n="th_date"></th><th data-i18n="th_total"></th><th data-i18n="th_grade"></th>
+          <th>CREATE</th><th>CONNECT</th><th>CONVERT</th><th>CONFIRM</th><th>CONTINUE</th>
+        </tr>
+      </thead>
       <tbody></tbody>
     </table>
   </div>

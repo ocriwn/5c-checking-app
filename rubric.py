@@ -87,8 +87,10 @@ TOTAL_MAX_SCORE = sum(item["max"] for cat in CATEGORIES for item in cat["items"]
 
 
 def grade_for(score):
+    """Returns a stable, language-independent grade code.
+    Display labels are looked up per-language via translations.GRADE_LABELS."""
     if score >= 90:
-        return "優秀"
+        return "excellent"
     if score >= 85:
-        return "合格"
-    return "待加強"
+        return "pass"
+    return "growing"

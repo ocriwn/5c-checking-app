@@ -3,6 +3,10 @@ const state = {
   stores: [],
   categoryChart: null,
   trendChart: null,
+  lang: "zh-TW",
+  ui: {},
+  gradeLabels: {},
+  languages: [],
 };
 
 const CATEGORY_ORDER = ["CREATE", "CONNECT", "CONVERT", "CONFIRM", "CONTINUE"];
@@ -14,6 +18,20 @@ const CATEGORY_COLORS = {
   CONTINUE: "#8c6239",
 };
 
+const ERROR_CODE_KEY = {
+  store_name_required: "err_store_name_required",
+  missing_fields: "err_missing_fields",
+  no_items: "err_no_items",
+};
+
+function t(key) {
+  return state.ui[key] || key;
+}
+
+function gradeLabel(code) {
+  return state.gradeLabels[code] || code;
+}
+
 async function api(path, options) {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json" },
@@ -21,9 +39,62 @@ async function api(path, options) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || "請求失敗");
+    const translated = err.code && ERROR_CODE_KEY[err.code] ? t(ERROR_CODE_KEY[err.code]) : null;
+    throw new Error(translated || err.error || t("err_generic"));
   }
   return res.json();
+}
+
+function withLang(path) {
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}lang=${encodeURIComponent(state.lang)}`;
+}
+
+// ---------- Language ----------
+function getStoredLang() {
+  return localStorage.getItem("lang") || "zh-TW";
+}
+
+async function loadI18n() {
+  const data = await api(`/api/i18n?lang=${encodeURIComponent(state.lang)}`);
+  state.ui = data.ui;
+  state.gradeLabels = data.gradeLabels;
+  state.languages = data.languages;
+}
+
+function applyStaticTranslations() {
+  document.documentElement.lang = state.lang;
+  document.title = t("brand_title");
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+}
+
+function setupLangSwitcher() {
+  const btn = document.getElementById("btn-lang");
+  const menu = document.getElementById("lang-menu");
+  menu.innerHTML = "";
+  state.languages.forEach((l) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.textContent = l.native_name;
+    if (l.code === state.lang) item.classList.add("active");
+    item.addEventListener("click", () => {
+      localStorage.setItem("lang", l.code);
+      location.reload();
+    });
+    menu.appendChild(item);
+  });
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+  });
+  document.addEventListener("click", () => {
+    menu.hidden = true;
+  });
 }
 
 // ---------- Navigation ----------
@@ -76,8 +147,8 @@ function renderCategories() {
       row.innerHTML = `
         <input type="checkbox" data-item="${item.id}" data-max="${item.max}" data-category="${cat.key}">
         <div class="item-text">${item.text}</div>
-        <div class="item-max">${item.max} 分</div>
-        <input type="text" class="item-feedback" data-feedback="${item.id}" placeholder="針對此項的反饋（可選）">
+        <div class="item-max">${t("pts_unit").replace("{n}", item.max)}</div>
+        <input type="text" class="item-feedback" data-feedback="${item.id}" placeholder="${t("item_feedback_placeholder")}">
       `;
       block.appendChild(row);
     });
@@ -86,9 +157,9 @@ function renderCategories() {
 
   const summary = document.createElement("div");
   summary.className = "sticky-summary";
-  summary.innerHTML = `<div>總分：<span class="score" id="live-total">0</span> / ${state.rubric.totalMaxScore}
-    <span class="grade" id="live-grade">未評分</span></div>
-    <button type="submit" class="btn-primary btn-submit">提交評分</button>`;
+  summary.innerHTML = `<div>${t("th_total")}：<span class="score" id="live-total">0</span> / ${state.rubric.totalMaxScore}
+    <span class="grade" id="live-grade">${t("live_grade_default")}</span></div>
+    <button type="submit" class="btn-primary btn-submit">${t("btn_submit")}</button>`;
   container.appendChild(summary);
 
   container.addEventListener("change", (e) => {
@@ -113,11 +184,11 @@ function updateTotals() {
   });
   document.getElementById("live-total").textContent = grandTotal;
   const gradeEl = document.getElementById("live-grade");
-  let grade = "待加強";
-  if (grandTotal >= 90) grade = "優秀";
-  else if (grandTotal >= 85) grade = "合格";
-  gradeEl.textContent = grade;
-  gradeEl.className = `grade grade-${grade}`;
+  let code = "growing";
+  if (grandTotal >= 90) code = "excellent";
+  else if (grandTotal >= 85) code = "pass";
+  gradeEl.textContent = gradeLabel(code);
+  gradeEl.className = `grade grade-${code}`;
 }
 
 async function loadStoresInto(selectEl, includeAllOption, labelAll) {
@@ -141,8 +212,8 @@ async function loadStoresInto(selectEl, includeAllOption, labelAll) {
 
 async function refreshAllStoreSelects() {
   await loadStoresInto(document.getElementById("f-store"), false, "");
-  await loadStoresInto(document.getElementById("h-store"), true, "全部門店");
-  await loadStoresInto(document.getElementById("a-store"), true, "全店鋪（全部門店）");
+  await loadStoresInto(document.getElementById("h-store"), true, t("filter_store_all"));
+  await loadStoresInto(document.getElementById("a-store"), true, t("filter_store_range_all"));
 }
 
 async function refreshEmployeeDatalist() {
@@ -154,9 +225,9 @@ async function refreshEmployeeDatalist() {
   dl2.innerHTML = evaluators.map((e) => `<option value="${e}">`).join("");
 
   const hSel = document.getElementById("h-employee");
-  hSel.innerHTML = '<option value="">全部員工</option>' + employees.map((e) => `<option value="${e}">${e}</option>`).join("");
+  hSel.innerHTML = `<option value="">${t("filter_employee_all")}</option>` + employees.map((e) => `<option value="${e}">${e}</option>`).join("");
   const aSel = document.getElementById("a-employee");
-  aSel.innerHTML = '<option value="">請選擇員工</option>' + employees.map((e) => `<option value="${e}">${e}</option>`).join("");
+  aSel.innerHTML = `<option value="">${t("select_employee_placeholder")}</option>` + employees.map((e) => `<option value="${e}">${e}</option>`).join("");
 }
 
 function toggleNewStoreRow(show) {
@@ -212,7 +283,7 @@ async function handleSubmit(e) {
 
   try {
     const result = await api("/api/evaluations", { method: "POST", body: JSON.stringify(payload) });
-    msg.textContent = `已儲存！總分 ${result.total_score} / 100，評級：${result.grade}`;
+    msg.textContent = `${t("msg_saved_prefix")} ${result.total_score} / 100${t("msg_saved_grade")}${gradeLabel(result.grade)}`;
     msg.className = "submit-msg success";
     resetScoreForm();
     refreshEmployeeDatalist();
@@ -241,7 +312,7 @@ async function loadHistory() {
     const tr = document.createElement("tr");
     tr.className = "clickable";
     tr.innerHTML = `<td>${r.eval_date}</td><td>${r.store_name}</td><td>${r.employee_name}</td><td>${r.evaluator_name}</td>
-      <td>${r.total_score} / ${r.max_score}</td><td><span class="pill pill-${r.grade}">${r.grade}</span></td><td>檢視 ›</td>`;
+      <td>${r.total_score} / ${r.max_score}</td><td><span class="pill pill-${r.grade}">${gradeLabel(r.grade)}</span></td><td>${t("view_detail_link")}</td>`;
     tr.addEventListener("click", () => showHistoryDetail(r.id));
     tbody.appendChild(tr);
   });
@@ -257,10 +328,10 @@ async function showHistoryDetail(id) {
     grouped[it.category] = grouped[it.category] || [];
     grouped[it.category].push(it);
   });
-  let html = `<h4>${d.eval_date} · ${d.store_name} · ${d.employee_name}（考核人：${d.evaluator_name}）</h4>
-    <p>總分：<strong>${d.total_score} / ${d.max_score}</strong> ｜ 評級：<span class="pill pill-${d.grade}">${d.grade}</span></p>
-    <p>總體感受：${d.overall_feelings.join("、") || "無"}</p>`;
-  if (d.overall_feedback) html += `<p>整體反饋：${d.overall_feedback}</p>`;
+  let html = `<h4>${d.eval_date} · ${d.store_name} · ${d.employee_name}（${t("detail_evaluator_label")}${d.evaluator_name}）</h4>
+    <p>${t("detail_total_label")}<strong>${d.total_score} / ${d.max_score}</strong>${t("detail_grade_label")}<span class="pill pill-${d.grade}">${gradeLabel(d.grade)}</span></p>
+    <p>${t("detail_feelings_label")}${d.overall_feelings.join("、") || t("detail_feelings_none")}</p>`;
+  if (d.overall_feedback) html += `<p>${t("detail_feedback_label")}${d.overall_feedback}</p>`;
 
   CATEGORY_ORDER.forEach((cat) => {
     const items = grouped[cat] || [];
@@ -270,7 +341,7 @@ async function showHistoryDetail(id) {
     items.forEach((it) => {
       const rubricItem = state.rubric.categories.find((c) => c.key === cat)?.items.find((i) => i.id === it.item_id);
       const text = rubricItem ? rubricItem.text : it.item_id;
-      html += `<div class="detail-item"><div class="txt">${text}${it.feedback ? `<br><em>反饋：${it.feedback}</em>` : ""}</div><div class="sc">${it.actual_score} / ${it.max_score}</div></div>`;
+      html += `<div class="detail-item"><div class="txt">${text}${it.feedback ? `<br><em>${t("detail_item_feedback_label")}${it.feedback}</em>` : ""}</div><div class="sc">${it.actual_score} / ${it.max_score}</div></div>`;
     });
   });
   panel.innerHTML = html;
@@ -286,7 +357,7 @@ async function renderCategoryChart() {
   const storeId = document.getElementById("a-store").value;
   const params = new URLSearchParams();
   if (storeId) params.set("store_id", storeId);
-  const data = await api(`/api/analytics/category-breakdown?${params.toString()}`);
+  const data = await api(withLang(`/api/analytics/category-breakdown?${params.toString()}`));
 
   const ctx = document.getElementById("chart-category");
   if (state.categoryChart) state.categoryChart.destroy();
@@ -296,7 +367,7 @@ async function renderCategoryChart() {
       labels: data.map((d) => d.name),
       datasets: [
         {
-          label: "達成率 (%)",
+          label: t("th_pct"),
           data: data.map((d) => d.pct ?? 0),
           backgroundColor: data.map((d) => CATEGORY_COLORS[d.category]),
         },
@@ -320,8 +391,8 @@ async function renderCategoryChart() {
     bestEl.textContent = `${best.name} · ${best.pct}%`;
     worstEl.textContent = `${worst.name} · ${worst.pct}%`;
   } else {
-    bestEl.textContent = "尚無資料";
-    worstEl.textContent = "尚無資料";
+    bestEl.textContent = "－";
+    worstEl.textContent = "－";
   }
 }
 
@@ -329,7 +400,7 @@ async function renderItemBreakdown() {
   const storeId = document.getElementById("a-store").value;
   const params = new URLSearchParams();
   if (storeId) params.set("store_id", storeId);
-  const data = await api(`/api/analytics/item-breakdown?${params.toString()}`);
+  const data = await api(withLang(`/api/analytics/item-breakdown?${params.toString()}`));
   const scored = data.filter((d) => d.pct !== null);
 
   const fillTable = (selector, rows) => {
@@ -359,18 +430,18 @@ async function renderEmployeeTrend() {
   state.trendChart = new Chart(chartCanvas, {
     type: "line",
     data: {
-      labels: trend.map((t) => t.eval_date),
+      labels: trend.map((row) => row.eval_date),
       datasets: [
         {
-          label: "總分",
-          data: trend.map((t) => t.total_score),
+          label: t("th_total"),
+          data: trend.map((row) => row.total_score),
           borderColor: "#0f2a4a",
           backgroundColor: "#0f2a4a",
           tension: 0.2,
         },
         ...CATEGORY_ORDER.map((cat) => ({
           label: cat,
-          data: trend.map((t) => t.categories[cat] ?? null),
+          data: trend.map((row) => row.categories[cat] ?? null),
           borderColor: CATEGORY_COLORS[cat],
           backgroundColor: CATEGORY_COLORS[cat],
           tension: 0.2,
@@ -385,18 +456,23 @@ async function renderEmployeeTrend() {
     },
   });
 
-  trend.forEach((t) => {
+  trend.forEach((row) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${t.eval_date}</td><td>${t.total_score}</td><td><span class="pill pill-${t.grade}">${t.grade}</span></td>` +
-      CATEGORY_ORDER.map((c) => `<td>${t.categories[c] ?? "-"}%</td>`).join("");
+    tr.innerHTML = `<td>${row.eval_date}</td><td>${row.total_score}</td><td><span class="pill pill-${row.grade}">${gradeLabel(row.grade)}</span></td>` +
+      CATEGORY_ORDER.map((c) => `<td>${row.categories[c] ?? "-"}%</td>`).join("");
     tbody.appendChild(tr);
   });
 }
 
 // ---------- Init ----------
 async function init() {
+  state.lang = getStoredLang();
+  await loadI18n();
+  applyStaticTranslations();
+  setupLangSwitcher();
   setupNav();
-  state.rubric = await api("/api/rubric");
+
+  state.rubric = await api(withLang("/api/rubric"));
   renderFeelings();
   renderCategories();
   await refreshAllStoreSelects();
