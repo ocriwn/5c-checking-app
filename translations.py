@@ -20,7 +20,7 @@ def norm_lang(lang):
 UI_STRINGS = {
     "zh-TW": {
         "brand_title": "5C 卓越旅程",
-        "tab_score": "打分",
+        "tab_score": "開始觀察",
         "tab_history": "歷史記錄",
         "tab_analytics": "資料分析",
         "field_date": "日期",
@@ -86,7 +86,7 @@ UI_STRINGS = {
     },
     "zh-CN": {
         "brand_title": "5C 卓越旅程",
-        "tab_score": "打分",
+        "tab_score": "开始观察",
         "tab_history": "历史记录",
         "tab_analytics": "资料分析",
         "field_date": "日期",
@@ -152,7 +152,7 @@ UI_STRINGS = {
     },
     "en": {
         "brand_title": "5C Excellence Journey",
-        "tab_score": "Score",
+        "tab_score": "Start Observing",
         "tab_history": "History",
         "tab_analytics": "Analytics",
         "field_date": "Date",
@@ -218,7 +218,7 @@ UI_STRINGS = {
     },
     "ja": {
         "brand_title": "5C エクセレンス・ジャーニー",
-        "tab_score": "採点",
+        "tab_score": "観察開始",
         "tab_history": "履歴",
         "tab_analytics": "分析",
         "field_date": "日付",
@@ -284,7 +284,7 @@ UI_STRINGS = {
     },
     "ko": {
         "brand_title": "5C 엑설런스 저니",
-        "tab_score": "평가",
+        "tab_score": "관찰 시작",
         "tab_history": "기록",
         "tab_analytics": "분석",
         "field_date": "날짜",
@@ -350,7 +350,7 @@ UI_STRINGS = {
     },
     "ms": {
         "brand_title": "5C Perjalanan Kecemerlangan",
-        "tab_score": "Skor",
+        "tab_score": "Mula Pemerhatian",
         "tab_history": "Sejarah",
         "tab_analytics": "Analitik",
         "field_date": "Tarikh",
