@@ -121,7 +121,7 @@
   <div class="analytics-grid">
     <div class="card">
       <h3>5C 各維度表現總覽</h3>
-      <canvas id="chart-category"></canvas>
+      <div class="chart-wrap"><canvas id="chart-category"></canvas></div>
       <p class="hint">達成率 = 該維度實際得分 ÷ 該維度滿分</p>
     </div>
     <div class="stacked-cards">
@@ -147,7 +147,7 @@
     <label>選擇員工
       <select id="a-employee"><option value="">請選擇員工</option></select>
     </label>
-    <canvas id="chart-employee-trend"></canvas>
+    <div class="chart-wrap"><canvas id="chart-employee-trend"></canvas></div>
     <table class="data-table small" id="employee-trend-table">
       <thead><tr><th>日期</th><th>總分</th><th>等級</th><th>CREATE</th><th>CONNECT</th><th>CONVERT</th><th>CONFIRM</th><th>CONTINUE</th></tr></thead>
       <tbody></tbody>

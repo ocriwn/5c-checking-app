@@ -304,6 +304,8 @@ async function renderCategoryChart() {
     },
     options: {
       indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
       scales: { x: { min: 0, max: 100 } },
       plugins: { legend: { display: false } },
     },
@@ -376,7 +378,11 @@ async function renderEmployeeTrend() {
         })),
       ],
     },
-    options: { scales: { y: { min: 0, max: 100 } } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: { y: { min: 0, max: 100 } },
+    },
   });
 
   trend.forEach((t) => {

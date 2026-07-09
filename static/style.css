@@ -203,6 +203,7 @@ textarea { resize: vertical; }
   gap: 16px;
   margin-bottom: 16px;
 }
+.highlight-cards > * { min-width: 0; }
 .highlight-card { margin-bottom: 0; border-left: 5px solid var(--border); }
 .highlight-good { border-left-color: var(--good); }
 .highlight-focus { border-left-color: var(--focus); }
@@ -214,8 +215,9 @@ textarea { resize: vertical; }
   grid-template-columns: 1.2fr 1fr;
   gap: 16px;
 }
-.stacked-cards { display: flex; flex-direction: column; gap: 16px; }
-.stacked-cards .card { margin-bottom: 0; }
+.analytics-grid > * { min-width: 0; }
+.stacked-cards { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.stacked-cards .card { margin-bottom: 0; min-width: 0; }
 @media (max-width: 900px) {
   .analytics-grid { grid-template-columns: 1fr; }
   .highlight-cards { grid-template-columns: 1fr; }
@@ -223,7 +225,12 @@ textarea { resize: vertical; }
 
 .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
-canvas { max-height: 320px; }
+.chart-wrap { position: relative; width: 100%; height: 320px; max-width: 100%; overflow: hidden; }
+.chart-wrap canvas { max-width: 100%; }
+
+@media (max-width: 640px) {
+  .chart-wrap { height: 260px; }
+}
 
 .card:has(.data-table) { overflow-x: auto; }
 
