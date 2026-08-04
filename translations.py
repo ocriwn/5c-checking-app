@@ -593,7 +593,7 @@ ITEM_I18N = {
         "ms": "Perhatikan dan rekodkan maklumat pelanggan sebagai asas untuk Clienteling.",
     },
     "connect_7": {
-        "zh-CN": "暂离顾客时主动说明原因预计时间，让顾客有事做，再次自我介绍，回来后感谢等待。",
+        "zh-CN": "暂离前说明原因与时间，让顾客有事做；回来后重新致意并感谢等待。",
         "en": "When stepping away, explain the reason and expected time, set up next steps, reintroduce yourself on return, and thank the customer for waiting.",
         "ja": "一時的に離れる際は理由と所要時間を伝え、準備を整え、戻った際に再度自己紹介し、お待たせしたことへの感謝を伝える。",
         "ko": "잠시 자리를 비울 때는 이유와 예상 시간을 안내하고, 준비를 마친 뒤 돌아와 다시 자기소개하며 기다려 주신 것에 감사를 표한다.",
