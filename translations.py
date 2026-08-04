@@ -691,11 +691,11 @@ ITEM_I18N = {
         "ms": "Gunakan alat digital (telefon / iPad) untuk berinteraksi dengan pelanggan semasa lawatan.",
     },
     "confirm_1": {
-        "zh-CN": "商品依 RL 标准包装，并护送至收银台，在递交给顾客前，1. 检查瑕疵、2. 拔除防盗扣、3. 确认发票明细无误",
-        "en": "Package the item to RL standards and escort it to the register. Before handing it to the customer: 1) check for defects, 2) remove security tags, 3) confirm the receipt details are correct.",
-        "ja": "RLの基準に従って商品を梱包し、レジまでお持ちする。お渡しする前に、1. 傷や欠陥の確認、2. 防犯タグの取り外し、3. 領収書内容の確認を行う。",
-        "ko": "RL 기준에 따라 상품을 포장하여 계산대까지 안내한다. 고객에게 전달하기 전 1) 하자 확인, 2) 도난 방지 택 제거, 3) 영수증 내역 확인을 진행한다.",
-        "ms": "Bungkus produk mengikut standard RL dan hantar ke kaunter bayaran. Sebelum diserahkan kepada pelanggan: 1) periksa kecacatan, 2) tanggalkan tag keselamatan, 3) sahkan butiran resit adalah betul.",
+        "zh-CN": "商品依 RL 标准包装，并护送至收银台；递交前依序 1. 检查瑕疵、2. 拔除防盗扣、3. 确认发票明细无误，再双手将商品递交给顾客。",
+        "en": "Package the item to RL standards and escort it to the register. Before handing it over: 1) check for defects, 2) remove security tags, 3) confirm the receipt details are correct — then present the item to the customer with both hands.",
+        "ja": "RLの基準に従って商品を梱包し、レジまでお持ちする。お渡しする前に、1. 傷や欠陥の確認、2. 防犯タグの取り外し、3. 領収書内容の確認を行い、両手で商品をお渡しする。",
+        "ko": "RL 기준에 따라 상품을 포장하여 계산대까지 안내한다. 전달하기 전 1) 하자 확인, 2) 도난 방지 택 제거, 3) 영수증 내역 확인을 진행한 뒤, 두 손으로 상품을 전달한다.",
+        "ms": "Bungkus produk mengikut standard RL dan hantar ke kaunter bayaran. Sebelum diserahkan: 1) periksa kecacatan, 2) tanggalkan tag keselamatan, 3) sahkan butiran resit adalah betul, kemudian serahkan produk kepada pelanggan menggunakan kedua-dua belah tangan.",
     },
     "confirm_2": {
         "zh-CN": "提及任一建议服务（修改、售后、商品洗涤合作店家、鞋保养等）",
