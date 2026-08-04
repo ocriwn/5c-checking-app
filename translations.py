@@ -677,7 +677,7 @@ ITEM_I18N = {
         "ms": "Pecahkan stereotaip dengan cadangan merentas kategori apabila sesuai (contohnya mencadangkan pakaian lelaki bersaiz oversize kepada pelanggan wanita).",
     },
     "convert_12": {
-        "zh-CN": "利用顾客试穿的空档，在外场用 AI 快速生成视觉化穿搭提案（Total Look）或者利用 AI 进行肤色/脸型/版型/颜色推荐",
+        "zh-CN": "利用顾客试穿的空档，在外场准备穿搭提案（Total Look）或者利用辅销工具进行肤色/脸型/版型/颜色推荐",
         "en": "While the customer is trying items on, use AI in the sales floor to quickly generate a visual Total Look proposal, or use AI for skin tone / face shape / fit / color recommendations.",
         "ja": "お客様が試着している間に、売り場でAIを活用して視覚的なコーディネート提案 (Total Look) を素早く作成する、または肌色・顔の形・サイズ感・色の提案にAIを活用する。",
         "ko": "고객이 피팅하는 동안 매장에서 AI를 활용해 시각적인 토탈룩 (Total Look) 제안을 빠르게 생성하거나, 피부톤/얼굴형/핏/컬러 추천에 AI를 활용한다.",

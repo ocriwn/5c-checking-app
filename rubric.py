@@ -51,7 +51,7 @@ CATEGORIES = [
             {"id": "convert_9", "max": 2, "text": "遇到缺碼時，主動執行「交叉銷售 (Cross-selling)」提供替代方案"},
             {"id": "convert_10", "max": 3, "text": "主動提問了解異議並協助消除（確認→瞭解→回應）"},
             {"id": "convert_11", "max": 3, "text": "能適時打破刻板印象提供跨界建議（如推薦女性試穿男裝 Oversize）"},
-            {"id": "convert_12", "max": 3, "text": "利用顧客試穿的空檔，在外場用 AI 快速生成視覺化穿搭提案（Total Look）或者利用 AI 進行膚色/臉型/版型/顏色推薦"},
+            {"id": "convert_12", "max": 3, "text": "利用顧客試穿的空檔，在外場準備穿搭提案（Total Look）或者利用輔銷工具進行膚色/臉型/版型/顏色推薦"},
             {"id": "convert_13", "max": 2, "text": "訪問期間使用數位工具（手機／iPad）與顧客互動"},
         ],
     },
