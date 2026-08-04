@@ -586,7 +586,7 @@ ITEM_I18N = {
         "ms": "Ambil berat tentang keselesaan pelanggan (tawarkan tempat duduk, teh/air, payung semasa hujan, layan kanak-kanak).",
     },
     "connect_6": {
-        "zh-CN": "观察并记录顾客信息，作为 Clienteling 依据",
+        "zh-CN": "观察并留意顾客信息，作为 Clienteling 依据",
         "en": "Observe and record customer information as a basis for Clienteling.",
         "ja": "お客様の情報を観察・記録し、クライアンテリング (Clienteling) の基礎とする。",
         "ko": "고객 정보를 관찰하고 기록하여 클라이언텔링 (Clienteling)의 근거로 삼는다.",
