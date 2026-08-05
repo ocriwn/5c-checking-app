@@ -663,11 +663,11 @@ ITEM_I18N = {
         "ms": 'Apabila saiz kehabisan stok, jalankan "Cross-selling" secara proaktif untuk menawarkan alternatif.',
     },
     "convert_10": {
-        "zh-CN": "主动提问了解异议并协助消除（确认→了解→回应）",
-        "en": "Proactively ask questions to understand objections and help resolve them (Confirm → Understand → Respond).",
-        "ja": "積極的に質問し、異議を理解した上で解消する（確認→理解→対応）。",
-        "ko": "적극적으로 질문하여 이의를 파악하고 해소를 돕는다 (확인→이해→응답).",
-        "ms": "Bertanya secara proaktif untuk memahami bantahan dan membantu menyelesaikannya (Sahkan → Fahami → Respons).",
+        "zh-CN": "主动提问了解异议并协助消除（同理→确认→传递价值）",
+        "en": "Proactively ask questions to understand objections and help resolve them (Empathize → Confirm → Deliver Value).",
+        "ja": "積極的に質問し、異議を理解した上で解消する（共感→確認→価値提供）。",
+        "ko": "적극적으로 질문하여 이의를 파악하고 해소를 돕는다 (공감→확인→가치 전달).",
+        "ms": "Bertanya secara proaktif untuk memahami bantahan dan membantu menyelesaikannya (Empati → Sahkan → Sampaikan Nilai).",
     },
     "convert_11": {
         "zh-CN": "能适时打破刻板印象提供跨界建议（如推荐女性试穿男装 Oversize）",
