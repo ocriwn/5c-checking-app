@@ -194,7 +194,12 @@ def api_evaluations():
         if not items:
             return jsonify({"error": UI_STRINGS["zh-TW"]["err_no_items"], "code": "no_items"}), 400
 
+        # Categories the observer didn't get a chance to see this time simply
+        # send no items for that category, so they're excluded from both the
+        # numerator and denominator here (and from analytics aggregates,
+        # since no evaluation_items rows get written for them).
         total_score = 0.0
+        max_score = 0.0
         item_rows = []
         for item_id, entry in items.items():
             if item_id not in ITEM_INDEX:
@@ -203,11 +208,15 @@ def api_evaluations():
             checked = bool(entry.get("checked"))
             actual = rubric_item["max"] if checked else 0
             total_score += actual
+            max_score += rubric_item["max"]
             item_rows.append(
                 (category, item_id, rubric_item["max"], actual, entry.get("feedback", ""))
             )
 
-        grade = grade_for(total_score)
+        if max_score <= 0:
+            return jsonify({"error": UI_STRINGS["zh-TW"]["err_no_items"], "code": "no_items"}), 400
+
+        grade = grade_for(total_score, max_score)
         created_at = datetime.now().isoformat(timespec="seconds")
 
         cur = db.execute(
@@ -223,7 +232,7 @@ def api_evaluations():
                 json.dumps(overall_feelings, ensure_ascii=False),
                 overall_feedback,
                 total_score,
-                TOTAL_MAX_SCORE,
+                max_score,
                 grade,
                 created_at,
             ),
@@ -236,7 +245,7 @@ def api_evaluations():
             [(evaluation_id, *row) for row in item_rows],
         )
         db.commit()
-        return jsonify({"id": evaluation_id, "total_score": total_score, "grade": grade}), 201
+        return jsonify({"id": evaluation_id, "total_score": total_score, "max_score": max_score, "grade": grade}), 201
 
     store_id = request.args.get("store_id")
     employee_name = request.args.get("employee_name")

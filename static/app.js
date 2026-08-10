@@ -138,7 +138,10 @@ function renderCategories() {
     const header = document.createElement("div");
     header.className = "category-header";
     header.innerHTML = `<div><h3 style="display:inline">${cat.name}<span class="subtitle">${cat.subtitle}</span></h3></div>
-      <div class="category-subtotal" data-subtotal="${cat.key}">0 / ${cat.items.reduce((s, i) => s + i.max, 0)}</div>`;
+      <div class="category-header-right">
+        <label class="na-toggle"><input type="checkbox" class="na-checkbox" data-na="${cat.key}"> ${t("na_toggle_label")}</label>
+        <div class="category-subtotal" data-subtotal="${cat.key}">0 / ${cat.items.reduce((s, i) => s + i.max, 0)}</div>
+      </div>`;
     block.appendChild(header);
 
     cat.items.forEach((item) => {
@@ -157,20 +160,35 @@ function renderCategories() {
 
   const summary = document.createElement("div");
   summary.className = "sticky-summary";
-  summary.innerHTML = `<div>${t("th_total")}：<span class="score" id="live-total">0</span> / ${state.rubric.totalMaxScore}
+  summary.innerHTML = `<div>${t("th_total")}：<span class="score" id="live-total">0</span> / <span id="live-max">${state.rubric.totalMaxScore}</span>
     <span class="grade" id="live-grade">${t("live_grade_default")}</span></div>
     <button type="submit" class="btn-primary btn-submit">${t("btn_submit")}</button>`;
   container.appendChild(summary);
 
   container.addEventListener("change", (e) => {
     if (e.target.matches("input[type=checkbox][data-item]")) updateTotals();
+    if (e.target.matches(".na-checkbox")) toggleCategoryExcluded(e.target.dataset.na, e.target.checked);
+  });
+  updateTotals();
+}
+
+function toggleCategoryExcluded(catKey, excluded) {
+  const block = document.querySelector(`.category-block[data-category="${catKey}"]`);
+  if (!block) return;
+  block.classList.toggle("excluded", excluded);
+  block.querySelectorAll('input[type=checkbox][data-item], input.item-feedback').forEach((el) => {
+    el.disabled = excluded;
+    if (excluded && el.type === "checkbox") el.checked = false;
   });
   updateTotals();
 }
 
 function updateTotals() {
   let grandTotal = 0;
+  let grandMax = 0;
   CATEGORY_ORDER.forEach((catKey) => {
+    const block = document.querySelector(`.category-block[data-category="${catKey}"]`);
+    const excluded = block && block.classList.contains("excluded");
     const boxes = document.querySelectorAll(`input[data-category="${catKey}"]`);
     let sub = 0;
     let max = 0;
@@ -178,15 +196,20 @@ function updateTotals() {
       max += Number(b.dataset.max);
       if (b.checked) sub += Number(b.dataset.max);
     });
-    grandTotal += sub;
     const el = document.querySelector(`[data-subtotal="${catKey}"]`);
-    if (el) el.textContent = `${sub} / ${max}`;
+    if (el) el.textContent = excluded ? t("na_short") : `${sub} / ${max}`;
+    if (!excluded) {
+      grandTotal += sub;
+      grandMax += max;
+    }
   });
   document.getElementById("live-total").textContent = grandTotal;
+  document.getElementById("live-max").textContent = grandMax;
   const gradeEl = document.getElementById("live-grade");
+  const pct = grandMax > 0 ? (grandTotal / grandMax) * 100 : 0;
   let code = "growing";
-  if (grandTotal >= 90) code = "excellent";
-  else if (grandTotal >= 85) code = "pass";
+  if (grandMax > 0 && pct >= 90) code = "excellent";
+  else if (grandMax > 0 && pct >= 85) code = "pass";
   gradeEl.textContent = gradeLabel(code);
   gradeEl.className = `grade grade-${code}`;
 }
@@ -248,7 +271,7 @@ async function handleConfirmAddStore() {
 
 function collectItems() {
   const items = {};
-  document.querySelectorAll("input[type=checkbox][data-item]").forEach((box) => {
+  document.querySelectorAll(".category-block:not(.excluded) input[type=checkbox][data-item]").forEach((box) => {
     const id = box.dataset.item;
     const feedbackEl = document.querySelector(`[data-feedback="${id}"]`);
     items[id] = { checked: box.checked, feedback: feedbackEl ? feedbackEl.value : "" };
@@ -257,8 +280,15 @@ function collectItems() {
 }
 
 function resetScoreForm() {
-  document.querySelectorAll('#categories-container input[type=checkbox]').forEach((b) => (b.checked = false));
-  document.querySelectorAll('#categories-container input.item-feedback').forEach((b) => (b.value = ""));
+  document.querySelectorAll('#categories-container input[type=checkbox]').forEach((b) => {
+    b.checked = false;
+    b.disabled = false;
+  });
+  document.querySelectorAll('#categories-container input.item-feedback').forEach((b) => {
+    b.value = "";
+    b.disabled = false;
+  });
+  document.querySelectorAll('.category-block.excluded').forEach((b) => b.classList.remove("excluded"));
   document.querySelectorAll('#feelings-options input').forEach((b) => (b.checked = false));
   document.getElementById("f-overall-feedback").value = "";
   document.getElementById("f-employee").value = "";
@@ -283,7 +313,7 @@ async function handleSubmit(e) {
 
   try {
     const result = await api("/api/evaluations", { method: "POST", body: JSON.stringify(payload) });
-    msg.textContent = `${t("msg_saved_prefix")} ${result.total_score} / 100${t("msg_saved_grade")}${gradeLabel(result.grade)}`;
+    msg.textContent = `${t("msg_saved_prefix")} ${result.total_score} / ${result.max_score}${t("msg_saved_grade")}${gradeLabel(result.grade)}`;
     msg.className = "submit-msg success";
     resetScoreForm();
     refreshEmployeeDatalist();

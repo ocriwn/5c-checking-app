@@ -1,4 +1,4 @@
-# 5C Role Play 評分細則（來源：RL_5C_RolePlay_Evaluation_Form 0609.xlsx）
+# 5C Role Play 觀察細則（來源：RL_5C_RolePlay_Evaluation_Form 0609.xlsx）
 
 OVERALL_FEELINGS = [
     "啟發理想生活的嚮往感",
@@ -84,11 +84,16 @@ ITEM_INDEX = {item["id"]: (cat["key"], item) for cat in CATEGORIES for item in c
 TOTAL_MAX_SCORE = sum(item["max"] for cat in CATEGORIES for item in cat["items"])
 
 
-def grade_for(score):
-    """Returns a stable, language-independent grade code.
+def grade_for(score, max_score):
+    """Returns a stable, language-independent grade code, based on the
+    percentage of max_score actually applicable to this observation
+    (some 5C dimensions may be marked not-observed and excluded).
     Display labels are looked up per-language via translations.GRADE_LABELS."""
-    if score >= 90:
+    if max_score <= 0:
+        return "growing"
+    pct = score / max_score * 100
+    if pct >= 90:
         return "excellent"
-    if score >= 85:
+    if pct >= 85:
         return "pass"
     return "growing"
