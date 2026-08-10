@@ -27,8 +27,8 @@ CATEGORIES = [
         "subtitle": "建立關係",
         "items": [
             {"id": "connect_1", "max": 3, "text": "敏銳觀察顧客和其同行者、穿著風格或提袋，使用問題自然破冰開啟對話。"},
-            {"id": "connect_2", "max": 2, "text": "運用開放式問題 (Open Questions, 5W1H) 探索顧客需求"},
-            {"id": "connect_2b", "max": 2, "text": "運用開放式問題 (Open Questions, 5W1H) 深入探索顧客夢想與渴望"},
+            {"id": "connect_2", "max": 3, "text": "運用開放式問題 (Open Questions, 5W1H) 探索顧客需求"},
+            {"id": "connect_2b", "max": 3, "text": "運用開放式問題 (Open Questions, 5W1H) 深入探索顧客夢想與渴望"},
             {"id": "connect_3", "max": 2, "text": "主動傾聽，對顧客分享的資訊給予回應 (Echo)"},
             {"id": "connect_4", "max": 4, "text": "適度分享自己，於個人層面建立連結與信任"},
             {"id": "connect_5", "max": 2, "text": "關注顧客舒適度（賜座、奉茶水、雨天接傘、安撫孩童）"},
