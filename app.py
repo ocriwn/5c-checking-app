@@ -291,6 +291,51 @@ def api_me():
     return jsonify(user_public(user) if user else None)
 
 
+@app.route("/api/admin/users", methods=["POST"])
+@admin_required
+def api_admin_add_user():
+    """Admin-only: create or update a store_manager/rm/admin account.
+    Region/store are created on the fly by name if they don't exist yet,
+    so this one call is enough for "add manager X at store Y in region Z"."""
+    db = get_db()
+    payload = request.json or {}
+    name = (payload.get("name") or "").strip()
+    pin = (payload.get("pin") or "").strip()
+    role = payload.get("role")
+    store_name = (payload.get("store_name") or "").strip() or None
+    region_name = (payload.get("region_name") or "").strip() or None
+
+    if not name or not pin or role not in ("store_manager", "rm", "admin"):
+        return jsonify({"error": "缺少必要欄位或角色不正確"}), 400
+
+    region_id = None
+    if region_name:
+        db.execute("INSERT OR IGNORE INTO regions (name) VALUES (?)", (region_name,))
+        region_id = db.execute("SELECT id FROM regions WHERE name = ?", (region_name,)).fetchone()["id"]
+
+    home_store_id = None
+    if store_name:
+        row = db.execute("SELECT id FROM stores WHERE name = ?", (store_name,)).fetchone()
+        if row:
+            home_store_id = row["id"]
+            if region_id:
+                db.execute("UPDATE stores SET region_id = ? WHERE id = ?", (region_id, home_store_id))
+        else:
+            cur = db.execute("INSERT INTO stores (name, region_id) VALUES (?, ?)", (store_name, region_id))
+            home_store_id = cur.lastrowid
+
+    pin_hash = generate_password_hash(pin, method="pbkdf2:sha256")
+    db.execute(
+        """INSERT INTO users (name, pin_hash, role, home_store_id, region_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(name) DO UPDATE SET pin_hash=excluded.pin_hash, role=excluded.role,
+               home_store_id=excluded.home_store_id, region_id=excluded.region_id""",
+        (name, pin_hash, role, home_store_id, region_id, datetime.now().isoformat(timespec="seconds")),
+    )
+    db.commit()
+    return jsonify({"ok": True, "name": name, "role": role}), 201
+
+
 @app.route("/api/stores", methods=["GET", "POST"])
 @login_required
 def api_stores():
