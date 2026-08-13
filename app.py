@@ -604,7 +604,33 @@ def api_employee_trend():
     return jsonify(trend)
 
 
+def seed_admin():
+    """First-run only: if the users table is completely empty and
+    ADMIN_NAME/ADMIN_PIN are set (Render env vars, not committed to git),
+    create the initial HQ admin account so someone can log in at all."""
+    admin_name = os.environ.get("ADMIN_NAME")
+    admin_pin = os.environ.get("ADMIN_PIN")
+    if not admin_name or not admin_pin:
+        return
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        existing = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        if existing == 0:
+            conn.execute(
+                "INSERT INTO users (name, pin_hash, role, created_at) VALUES (?, ?, 'admin', ?)",
+                (
+                    admin_name,
+                    generate_password_hash(admin_pin, method="pbkdf2:sha256"),
+                    datetime.now().isoformat(timespec="seconds"),
+                ),
+            )
+            conn.commit()
+    finally:
+        conn.close()
+
+
 init_db()
+seed_admin()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5057))

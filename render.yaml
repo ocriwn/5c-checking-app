@@ -12,6 +12,10 @@ services:
         value: "0"
       - key: SECRET_KEY
         generateValue: true
+      - key: ADMIN_NAME
+        sync: false
+      - key: ADMIN_PIN
+        sync: false
     disk:
       name: 5c-data
       mountPath: /data
