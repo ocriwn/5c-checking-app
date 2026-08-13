@@ -1,9 +1,11 @@
 import json
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
+from functools import wraps
 
-from flask import Flask, g, jsonify, request, send_from_directory
+from flask import Flask, g, jsonify, request, send_from_directory, session
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from rubric import CATEGORIES, ITEM_INDEX, OVERALL_FEELINGS, TOTAL_MAX_SCORE, grade_for
 from translations import (
@@ -46,10 +48,14 @@ def localized_item_text(item_id, lang):
         return rubric_item["text"]
     return ITEM_I18N.get(item_id, {}).get(lang, rubric_item["text"])
 
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "data", "5c.db"))
 
 app = Flask(__name__, static_folder=os.path.join(BASE_DIR, "static"), static_url_path="")
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-insecure-key-change-in-render-env")
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.permanent_session_lifetime = timedelta(days=30)
 
 
 def get_db():
@@ -73,9 +79,24 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     conn.executescript(
         """
+        CREATE TABLE IF NOT EXISTS regions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS stores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            pin_hash TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('store_manager','rm','admin')),
+            home_store_id INTEGER REFERENCES stores(id),
+            region_id INTEGER REFERENCES regions(id),
+            created_at TEXT NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS evaluations (
@@ -103,8 +124,106 @@ def init_db():
         );
         """
     )
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(stores)").fetchall()]
+    if "region_id" not in cols:
+        conn.execute("ALTER TABLE stores ADD COLUMN region_id INTEGER REFERENCES regions(id)")
     conn.commit()
     conn.close()
+
+
+# ---------- Auth helpers ----------
+
+def current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    row = get_db().execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def user_public(user):
+    db = get_db()
+    home_store_name = None
+    if user.get("home_store_id"):
+        r = db.execute("SELECT name FROM stores WHERE id = ?", (user["home_store_id"],)).fetchone()
+        home_store_name = r["name"] if r else None
+    region_id = user.get("region_id")
+    if not region_id and user.get("home_store_id"):
+        r = db.execute("SELECT region_id FROM stores WHERE id = ?", (user["home_store_id"],)).fetchone()
+        region_id = r["region_id"] if r else None
+    region_name = None
+    if region_id:
+        r = db.execute("SELECT name FROM regions WHERE id = ?", (region_id,)).fetchone()
+        region_name = r["name"] if r else None
+    return {
+        "id": user["id"],
+        "name": user["name"],
+        "role": user["role"],
+        "home_store_id": user.get("home_store_id"),
+        "home_store_name": home_store_name,
+        "region_id": region_id,
+        "region_name": region_name,
+    }
+
+
+def view_scope_store_ids(user):
+    """Store ids this user may VIEW history/analytics for. None = unrestricted (admin)."""
+    db = get_db()
+    if user["role"] == "admin":
+        return None
+    if user["role"] == "rm":
+        return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (user["region_id"],))]
+    return [user["home_store_id"]]
+
+
+def submit_scope_store_ids(user):
+    """Store ids this user may SUBMIT an observation for. None = unrestricted (admin)."""
+    db = get_db()
+    if user["role"] == "admin":
+        return None
+    if user["role"] == "rm":
+        return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (user["region_id"],))]
+    home = db.execute("SELECT region_id FROM stores WHERE id = ?", (user["home_store_id"],)).fetchone()
+    if not home or home["region_id"] is None:
+        return [user["home_store_id"]]
+    return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (home["region_id"],))]
+
+
+def apply_view_scope(query, params, user, alias="e"):
+    scope = view_scope_store_ids(user)
+    if scope is not None:
+        if not scope:
+            scope = [-1]
+        placeholders = ",".join("?" * len(scope))
+        query += f" AND {alias}.store_id IN ({placeholders})"
+        params = list(params) + scope
+    return query, params
+
+
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        user = current_user()
+        if not user:
+            return jsonify({"error": "請先登入", "code": "login_required"}), 401
+        g.user = user
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        user = current_user()
+        if not user:
+            return jsonify({"error": "請先登入", "code": "login_required"}), 401
+        if user["role"] != "admin":
+            return jsonify({"error": "沒有權限", "code": "forbidden"}), 403
+        g.user = user
+        return f(*args, **kwargs)
+
+    return wrapper
 
 
 @app.route("/")
@@ -137,10 +256,48 @@ def api_i18n():
     )
 
 
+# ---------- Auth routes ----------
+
+@app.route("/api/users/names")
+def api_user_names():
+    rows = get_db().execute("SELECT name FROM users ORDER BY name").fetchall()
+    return jsonify([r["name"] for r in rows])
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    db = get_db()
+    payload = request.json or {}
+    name = (payload.get("name") or "").strip()
+    pin = (payload.get("pin") or "").strip()
+    row = db.execute("SELECT * FROM users WHERE name = ?", (name,)).fetchone()
+    if not row or not check_password_hash(row["pin_hash"], pin):
+        return jsonify({"error": "姓名或 PIN 錯誤", "code": "invalid_login"}), 401
+    session.clear()
+    session["user_id"] = row["id"]
+    session.permanent = True
+    return jsonify(user_public(dict(row)))
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/me")
+def api_me():
+    user = current_user()
+    return jsonify(user_public(user) if user else None)
+
+
 @app.route("/api/stores", methods=["GET", "POST"])
+@login_required
 def api_stores():
     db = get_db()
     if request.method == "POST":
+        if g.user["role"] != "admin":
+            return jsonify({"error": "沒有權限", "code": "forbidden"}), 403
         name = (request.json or {}).get("name", "").strip()
         if not name:
             return jsonify({"error": UI_STRINGS["zh-TW"]["err_store_name_required"], "code": "store_name_required"}), 400
@@ -151,32 +308,48 @@ def api_stores():
             pass
         row = db.execute("SELECT id, name FROM stores WHERE name = ?", (name,)).fetchone()
         return jsonify(dict(row)), 201
-    rows = db.execute("SELECT id, name FROM stores ORDER BY name").fetchall()
+
+    for_scope = request.args.get("for")
+    ids = submit_scope_store_ids(g.user) if for_scope == "submit" else view_scope_store_ids(g.user)
+    if ids is None:
+        rows = db.execute("SELECT id, name FROM stores ORDER BY name").fetchall()
+    elif not ids:
+        rows = []
+    else:
+        placeholders = ",".join("?" * len(ids))
+        rows = db.execute(f"SELECT id, name FROM stores WHERE id IN ({placeholders}) ORDER BY name", ids).fetchall()
     return jsonify([dict(r) for r in rows])
 
 
 @app.route("/api/employees")
+@login_required
 def api_employees():
     db = get_db()
+    query = "SELECT DISTINCT employee_name FROM evaluations e WHERE 1=1"
+    params = []
     store_id = request.args.get("store_id")
     if store_id:
-        rows = db.execute(
-            "SELECT DISTINCT employee_name FROM evaluations WHERE store_id = ? ORDER BY employee_name",
-            (store_id,),
-        ).fetchall()
-    else:
-        rows = db.execute("SELECT DISTINCT employee_name FROM evaluations ORDER BY employee_name").fetchall()
+        query += " AND e.store_id = ?"
+        params.append(store_id)
+    query, params = apply_view_scope(query, params, g.user)
+    query += " ORDER BY employee_name"
+    rows = db.execute(query, params).fetchall()
     return jsonify([r["employee_name"] for r in rows])
 
 
 @app.route("/api/evaluators")
+@login_required
 def api_evaluators():
     db = get_db()
-    rows = db.execute("SELECT DISTINCT evaluator_name FROM evaluations ORDER BY evaluator_name").fetchall()
+    query = "SELECT DISTINCT evaluator_name FROM evaluations e WHERE 1=1"
+    query, params = apply_view_scope(query, [], g.user)
+    query += " ORDER BY evaluator_name"
+    rows = db.execute(query, params).fetchall()
     return jsonify([r["evaluator_name"] for r in rows])
 
 
 @app.route("/api/evaluations", methods=["GET", "POST"])
+@login_required
 def api_evaluations():
     db = get_db()
     if request.method == "POST":
@@ -193,6 +366,10 @@ def api_evaluations():
             return jsonify({"error": UI_STRINGS["zh-TW"]["err_missing_fields"], "code": "missing_fields"}), 400
         if not items:
             return jsonify({"error": UI_STRINGS["zh-TW"]["err_no_items"], "code": "no_items"}), 400
+
+        allowed = submit_scope_store_ids(g.user)
+        if allowed is not None and int(store_id) not in allowed:
+            return jsonify({"error": "沒有權限為這間門店打分", "code": "forbidden"}), 403
 
         # Categories the observer didn't get a chance to see this time simply
         # send no items for that category, so they're excluded from both the
@@ -270,6 +447,7 @@ def api_evaluations():
     if date_to:
         query += " AND e.eval_date <= ?"
         params.append(date_to)
+    query, params = apply_view_scope(query, params, g.user)
     query += " ORDER BY e.eval_date DESC, e.id DESC"
 
     rows = db.execute(query, params).fetchall()
@@ -282,6 +460,7 @@ def api_evaluations():
 
 
 @app.route("/api/evaluations/<int:evaluation_id>")
+@login_required
 def api_evaluation_detail(evaluation_id):
     db = get_db()
     ev = db.execute(
@@ -291,6 +470,9 @@ def api_evaluation_detail(evaluation_id):
     ).fetchone()
     if not ev:
         return jsonify({"error": "not found"}), 404
+    scope = view_scope_store_ids(g.user)
+    if scope is not None and ev["store_id"] not in scope:
+        return jsonify({"error": "沒有權限", "code": "forbidden"}), 403
     items = db.execute(
         "SELECT * FROM evaluation_items WHERE evaluation_id = ?", (evaluation_id,)
     ).fetchall()
@@ -301,6 +483,7 @@ def api_evaluation_detail(evaluation_id):
 
 
 @app.route("/api/analytics/category-breakdown")
+@login_required
 def api_category_breakdown():
     db = get_db()
     store_id = request.args.get("store_id")
@@ -321,6 +504,7 @@ def api_category_breakdown():
     if employee_name:
         query += " AND e.employee_name = ?"
         params.append(employee_name)
+    query, params = apply_view_scope(query, params, g.user)
     query += " GROUP BY ei.category"
 
     rows = db.execute(query, params).fetchall()
@@ -347,6 +531,7 @@ def api_category_breakdown():
 
 
 @app.route("/api/analytics/item-breakdown")
+@login_required
 def api_item_breakdown():
     db = get_db()
     store_id = request.args.get("store_id")
@@ -363,6 +548,7 @@ def api_item_breakdown():
     if store_id:
         query += " AND e.store_id = ?"
         params.append(store_id)
+    query, params = apply_view_scope(query, params, g.user)
     query += " GROUP BY ei.item_id"
 
     rows = db.execute(query, params).fetchall()
@@ -386,17 +572,18 @@ def api_item_breakdown():
 
 
 @app.route("/api/analytics/employee-trend")
+@login_required
 def api_employee_trend():
     db = get_db()
     employee_name = request.args.get("employee_name")
     if not employee_name:
         return jsonify({"error": "employee_name required"}), 400
 
-    evals = db.execute(
-        """SELECT id, eval_date, total_score, max_score, grade
-           FROM evaluations WHERE employee_name = ? ORDER BY eval_date ASC, id ASC""",
-        (employee_name,),
-    ).fetchall()
+    query = "SELECT e.id, e.eval_date, e.total_score, e.max_score, e.grade FROM evaluations e WHERE e.employee_name = ?"
+    params = [employee_name]
+    query, params = apply_view_scope(query, params, g.user)
+    query += " ORDER BY e.eval_date ASC, e.id ASC"
+    evals = db.execute(query, params).fetchall()
 
     trend = []
     for ev in evals:

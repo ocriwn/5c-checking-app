@@ -25,6 +25,36 @@ body {
   color: var(--text);
 }
 
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rl-navy);
+  padding: 20px;
+}
+.login-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 36px 32px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  position: relative;
+}
+.login-brand { font-family: var(--font-serif); font-size: 16px; color: var(--muted); text-align: center; margin-bottom: 4px; }
+.login-card h2 { font-family: var(--font-serif); color: var(--rl-navy); text-align: center; margin: 0 0 24px; }
+.login-card form { display: flex; flex-direction: column; gap: 14px; }
+.login-card label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.login-card .btn-primary { margin-top: 8px; padding: 10px; font-size: 15px; }
+.login-error { color: var(--focus); font-size: 13px; min-height: 16px; }
+.login-lang-switcher { position: absolute; top: 14px; right: 14px; }
+.login-lang-switcher .lang-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.login-lang-switcher .lang-menu { top: calc(100% + 6px); }
+
+.user-info { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #fff; }
+.user-info .btn-ghost { padding: 6px 10px; font-size: 12px; }
+
 .topbar {
   background: var(--rl-navy);
   color: #fff;

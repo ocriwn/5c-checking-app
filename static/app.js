@@ -22,6 +22,7 @@ const ERROR_CODE_KEY = {
   store_name_required: "err_store_name_required",
   missing_fields: "err_missing_fields",
   no_items: "err_no_items",
+  invalid_login: "login_error",
 };
 
 function t(key) {
@@ -39,6 +40,7 @@ async function api(path, options) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    if (res.status === 401 && err.code === "login_required") showLogin();
     const translated = err.code && ERROR_CODE_KEY[err.code] ? t(ERROR_CODE_KEY[err.code]) : null;
     throw new Error(translated || err.error || t("err_generic"));
   }
@@ -73,9 +75,10 @@ function applyStaticTranslations() {
   });
 }
 
-function setupLangSwitcher() {
-  const btn = document.getElementById("btn-lang");
-  const menu = document.getElementById("lang-menu");
+function setupLangSwitcher(btnId, menuId) {
+  const btn = document.getElementById(btnId);
+  const menu = document.getElementById(menuId);
+  if (!btn || !menu) return;
   menu.innerHTML = "";
   state.languages.forEach((l) => {
     const item = document.createElement("button");
@@ -214,9 +217,10 @@ function updateTotals() {
   gradeEl.className = `grade grade-${code}`;
 }
 
-async function loadStoresInto(selectEl, includeAllOption, labelAll) {
-  const stores = await api("/api/stores");
-  state.stores = stores;
+async function loadStoresInto(selectEl, includeAllOption, labelAll, endpoint = "/api/stores") {
+  const stores = await api(endpoint);
+  if (endpoint === "/api/stores?for=submit") state.submitStores = stores;
+  else state.stores = stores;
   selectEl.querySelectorAll("option:not([data-keep])").forEach((o) => o.remove());
   if (includeAllOption) {
     const opt = document.createElement("option");
@@ -234,7 +238,7 @@ async function loadStoresInto(selectEl, includeAllOption, labelAll) {
 }
 
 async function refreshAllStoreSelects() {
-  await loadStoresInto(document.getElementById("f-store"), false, "");
+  await loadStoresInto(document.getElementById("f-store"), false, "", "/api/stores?for=submit");
   await loadStoresInto(document.getElementById("h-store"), true, t("filter_store_all"));
   await loadStoresInto(document.getElementById("a-store"), true, t("filter_store_range_all"));
 }
@@ -265,7 +269,7 @@ async function handleConfirmAddStore() {
   if (!name) return;
   await api("/api/stores", { method: "POST", body: JSON.stringify({ name }) });
   await refreshAllStoreSelects();
-  document.getElementById("f-store").value = state.stores.find((s) => s.name === name)?.id || "";
+  document.getElementById("f-store").value = state.submitStores.find((s) => s.name === name)?.id || "";
   toggleNewStoreRow(false);
 }
 
@@ -494,28 +498,87 @@ async function renderEmployeeTrend() {
   });
 }
 
+// ---------- Auth ----------
+function showLogin() {
+  document.getElementById("login-screen").hidden = false;
+  document.getElementById("app-shell").hidden = true;
+}
+
+function renderUserLabel() {
+  const roleKey = { store_manager: "role_store_manager", rm: "role_rm", admin: "role_admin" }[state.user.role] || "";
+  const roleLabel = roleKey ? t(roleKey) : "";
+  const scopeName = state.user.role === "rm" ? state.user.region_name : state.user.home_store_name;
+  const scopePart = scopeName ? ` · ${scopeName}` : "";
+  document.getElementById("user-label").textContent = `${t("logged_in_as")}${state.user.name}（${roleLabel}${scopePart}）`;
+  document.getElementById("btn-add-store").hidden = state.user.role !== "admin";
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const errEl = document.getElementById("login-error");
+  errEl.textContent = "";
+  const name = document.getElementById("login-name").value;
+  const pin = document.getElementById("login-pin").value;
+  try {
+    const user = await api("/api/login", { method: "POST", body: JSON.stringify({ name, pin }) });
+    document.getElementById("login-pin").value = "";
+    await enterApp(user);
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+async function handleLogout() {
+  await api("/api/logout", { method: "POST" }).catch(() => {});
+  location.reload();
+}
+
+async function enterApp(user) {
+  state.user = user;
+  document.getElementById("login-screen").hidden = true;
+  document.getElementById("app-shell").hidden = false;
+  renderUserLabel();
+  if (!state.booted) {
+    state.booted = true;
+    setupNav();
+    state.rubric = await api(withLang("/api/rubric"));
+    renderFeelings();
+    renderCategories();
+    document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("btn-add-store").addEventListener("click", () => toggleNewStoreRow(true));
+    document.getElementById("btn-cancel-store").addEventListener("click", () => toggleNewStoreRow(false));
+    document.getElementById("btn-confirm-store").addEventListener("click", handleConfirmAddStore);
+    document.getElementById("score-form").addEventListener("submit", handleSubmit);
+    document.getElementById("btn-filter-history").addEventListener("click", loadHistory);
+    document.getElementById("btn-refresh-analytics").addEventListener("click", refreshAnalytics);
+    document.getElementById("a-employee").addEventListener("change", renderEmployeeTrend);
+  }
+  // Scope-dependent data: always refresh on (re)entry in case a different user just logged in.
+  await refreshAllStoreSelects();
+  await refreshEmployeeDatalist();
+  renderUserLabel();
+}
+
 // ---------- Init ----------
 async function init() {
   state.lang = getStoredLang();
   await loadI18n();
   applyStaticTranslations();
-  setupLangSwitcher();
-  setupNav();
+  setupLangSwitcher("btn-lang", "lang-menu");
+  setupLangSwitcher("btn-lang-login", "lang-menu-login");
 
-  state.rubric = await api(withLang("/api/rubric"));
-  renderFeelings();
-  renderCategories();
-  await refreshAllStoreSelects();
-  await refreshEmployeeDatalist();
+  document.getElementById("login-form").addEventListener("submit", handleLogin);
+  document.getElementById("btn-logout").addEventListener("click", handleLogout);
 
-  document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
-  document.getElementById("btn-add-store").addEventListener("click", () => toggleNewStoreRow(true));
-  document.getElementById("btn-cancel-store").addEventListener("click", () => toggleNewStoreRow(false));
-  document.getElementById("btn-confirm-store").addEventListener("click", handleConfirmAddStore);
-  document.getElementById("score-form").addEventListener("submit", handleSubmit);
-  document.getElementById("btn-filter-history").addEventListener("click", loadHistory);
-  document.getElementById("btn-refresh-analytics").addEventListener("click", refreshAnalytics);
-  document.getElementById("a-employee").addEventListener("change", renderEmployeeTrend);
+  const names = await api("/api/users/names");
+  document.getElementById("login-name").innerHTML = names.map((n) => `<option value="${n}">${n}</option>`).join("");
+
+  const user = await api("/api/me").catch(() => null);
+  if (user) {
+    await enterApp(user);
+  } else {
+    showLogin();
+  }
 }
 
 init();

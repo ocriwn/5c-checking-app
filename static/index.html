@@ -16,6 +16,35 @@
 <script src="vendor/chart.umd.min.js"></script>
 </head>
 <body>
+
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">Ralph Lauren｜<span data-i18n="brand_title"></span></div>
+    <h2 data-i18n="login_title"></h2>
+    <form id="login-form">
+      <label><span data-i18n="login_name_label"></span>
+        <select id="login-name" required></select>
+      </label>
+      <label><span data-i18n="login_pin_label"></span>
+        <input type="password" id="login-pin" inputmode="numeric" autocomplete="current-password" required data-i18n-placeholder="login_pin_placeholder">
+      </label>
+      <div id="login-error" class="login-error"></div>
+      <button type="submit" class="btn-primary" data-i18n="login_button"></button>
+    </form>
+    <div class="login-lang-switcher">
+      <button type="button" id="btn-lang-login" class="lang-btn" aria-label="Language">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="12" cy="12" r="9"></circle>
+          <ellipse cx="12" cy="12" rx="4" ry="9"></ellipse>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+        </svg>
+      </button>
+      <div id="lang-menu-login" class="lang-menu" hidden></div>
+    </div>
+  </div>
+</div>
+
+<div id="app-shell" hidden>
 <header class="topbar">
   <div class="brand">Ralph Lauren｜<span data-i18n="brand_title"></span></div>
   <div class="topbar-right">
@@ -24,6 +53,10 @@
       <button class="tab-btn" data-view="history" data-i18n="tab_history"></button>
       <button class="tab-btn" data-view="analytics" data-i18n="tab_analytics"></button>
     </nav>
+    <div class="user-info">
+      <span id="user-label"></span>
+      <button type="button" id="btn-logout" class="btn-ghost" data-i18n="logout_button"></button>
+    </div>
     <div class="lang-switcher">
       <button type="button" id="btn-lang" class="lang-btn" aria-label="Language">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -176,6 +209,7 @@
 </section>
 
 </main>
+</div>
 
 <script src="app.js"></script>
 </body>
