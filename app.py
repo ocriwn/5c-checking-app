@@ -385,41 +385,47 @@ def api_admin_add_user():
     if not name or not pin or role not in ("store_manager", "rm", "admin", "viewer"):
         return jsonify({"error": "缺少必要欄位或角色不正確"}), 400
 
-    region_id = None
-    if region_name:
-        db.execute("INSERT OR IGNORE INTO regions (name) VALUES (?)", (region_name,))
-        region_id = db.execute("SELECT id FROM regions WHERE name = ?", (region_name,)).fetchone()["id"]
+    try:
+        region_id = None
+        if region_name:
+            db.execute("INSERT OR IGNORE INTO regions (name) VALUES (?)", (region_name,))
+            region_id = db.execute("SELECT id FROM regions WHERE name = ?", (region_name,)).fetchone()["id"]
 
-    store_ids = []
-    for store_name in store_names:
-        row = db.execute("SELECT id FROM stores WHERE name = ?", (store_name,)).fetchone()
-        if row:
-            sid = row["id"]
-            if region_id:
-                db.execute("UPDATE stores SET region_id = ? WHERE id = ?", (region_id, sid))
-        else:
-            cur = db.execute("INSERT INTO stores (name, region_id) VALUES (?, ?)", (store_name, region_id))
-            sid = cur.lastrowid
-        store_ids.append(sid)
-    home_store_id = store_ids[0] if store_ids else None
+        store_ids = []
+        for store_name in store_names:
+            row = db.execute("SELECT id FROM stores WHERE name = ?", (store_name,)).fetchone()
+            if row:
+                sid = row["id"]
+                if region_id:
+                    db.execute("UPDATE stores SET region_id = ? WHERE id = ?", (region_id, sid))
+            else:
+                cur = db.execute("INSERT INTO stores (name, region_id) VALUES (?, ?)", (store_name, region_id))
+                sid = cur.lastrowid
+            store_ids.append(sid)
+        home_store_id = store_ids[0] if store_ids else None
 
-    pin_hash = generate_password_hash(pin, method="pbkdf2:sha256")
-    db.execute(
-        """INSERT INTO users (name, pin_hash, role, home_store_id, region_id, title_group, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(name) DO UPDATE SET pin_hash=excluded.pin_hash, role=excluded.role,
-               home_store_id=excluded.home_store_id, region_id=excluded.region_id,
-               title_group=excluded.title_group""",
-        (name, pin_hash, role, home_store_id, region_id, title_group, datetime.now().isoformat(timespec="seconds")),
-    )
-    user_id = db.execute("SELECT id FROM users WHERE name = ?", (name,)).fetchone()["id"]
-    db.execute("DELETE FROM user_stores WHERE user_id = ?", (user_id,))
-    db.executemany(
-        "INSERT OR IGNORE INTO user_stores (user_id, store_id) VALUES (?, ?)",
-        [(user_id, sid) for sid in store_ids],
-    )
-    db.commit()
-    return jsonify({"ok": True, "name": name, "role": role, "store_ids": store_ids}), 201
+        pin_hash = generate_password_hash(pin, method="pbkdf2:sha256")
+        db.execute(
+            """INSERT INTO users (name, pin_hash, role, home_store_id, region_id, title_group, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(name) DO UPDATE SET pin_hash=excluded.pin_hash, role=excluded.role,
+                   home_store_id=excluded.home_store_id, region_id=excluded.region_id,
+                   title_group=excluded.title_group""",
+            (name, pin_hash, role, home_store_id, region_id, title_group, datetime.now().isoformat(timespec="seconds")),
+        )
+        user_id = db.execute("SELECT id FROM users WHERE name = ?", (name,)).fetchone()["id"]
+        db.execute("DELETE FROM user_stores WHERE user_id = ?", (user_id,))
+        db.executemany(
+            "INSERT OR IGNORE INTO user_stores (user_id, store_id) VALUES (?, ?)",
+            [(user_id, sid) for sid in store_ids],
+        )
+        db.commit()
+        return jsonify({"ok": True, "name": name, "role": role, "store_ids": store_ids}), 201
+    except Exception as exc:
+        db.rollback()
+        # TEMPORARY: surface the real error while we debug a production-only 500.
+        import traceback
+        return jsonify({"error": str(exc), "traceback": traceback.format_exc()}), 500
 
 
 @app.route("/api/stores", methods=["GET", "POST"])
