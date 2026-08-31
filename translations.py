@@ -97,6 +97,7 @@ UI_STRINGS = {
         "role_store_manager": "店長",
         "role_rm": "區域經理",
         "role_admin": "管理員",
+        "role_viewer": "唯讀管理員",
     },
     "zh-CN": {
         "brand_title": "5C 卓越旅程",
@@ -177,6 +178,7 @@ UI_STRINGS = {
         "role_store_manager": "店长",
         "role_rm": "区域经理",
         "role_admin": "管理员",
+        "role_viewer": "只读管理员",
     },
     "en": {
         "brand_title": "5C Excellence Journey",
@@ -257,6 +259,7 @@ UI_STRINGS = {
         "role_store_manager": "Store Manager",
         "role_rm": "Regional Manager",
         "role_admin": "Admin",
+        "role_viewer": "Read-only Admin",
     },
     "ja": {
         "brand_title": "5C エクセレンス・ジャーニー",
@@ -337,6 +340,7 @@ UI_STRINGS = {
         "role_store_manager": "店長",
         "role_rm": "リージョナルマネージャー",
         "role_admin": "管理者",
+        "role_viewer": "閲覧専用管理者",
     },
     "ko": {
         "brand_title": "5C 엑설런스 저니",
@@ -417,6 +421,7 @@ UI_STRINGS = {
         "role_store_manager": "점장",
         "role_rm": "지역 매니저",
         "role_admin": "관리자",
+        "role_viewer": "읽기 전용 관리자",
     },
     "ms": {
         "brand_title": "5C Perjalanan Kecemerlangan",
@@ -497,6 +502,7 @@ UI_STRINGS = {
         "role_store_manager": "Pengurus Kedai",
         "role_rm": "Pengurus Wilayah",
         "role_admin": "Pentadbir",
+        "role_viewer": "Pentadbir Baca Sahaja",
     },
 }
 

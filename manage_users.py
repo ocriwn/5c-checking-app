@@ -50,8 +50,9 @@ def assign_store(store_name, region_name):
     print(f"門店「{store_name}」已指定到區域「{region_name}」")
 
 
-def add_user(name, pin, role, store_names=None, region_name=None):
-    """store_names: list of store name strings (a store_manager may cover more than one)."""
+def add_user(name, pin, role, store_names=None, region_name=None, title_group=None):
+    """store_names: list of store name strings (a store_manager may cover more than one).
+    title_group: 'SM' or 'Supervisor', used to group the login picker; None for rm/admin."""
     conn = db()
     store_names = store_names or []
     store_ids = []
@@ -71,11 +72,12 @@ def add_user(name, pin, role, store_names=None, region_name=None):
         region_id = region["id"]
     pin_hash = generate_password_hash(str(pin), method="pbkdf2:sha256")
     conn.execute(
-        """INSERT INTO users (name, pin_hash, role, home_store_id, region_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)
+        """INSERT INTO users (name, pin_hash, role, home_store_id, region_id, title_group, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(name) DO UPDATE SET pin_hash=excluded.pin_hash, role=excluded.role,
-               home_store_id=excluded.home_store_id, region_id=excluded.region_id""",
-        (name, pin_hash, role, home_store_id, region_id, datetime.now().isoformat(timespec="seconds")),
+               home_store_id=excluded.home_store_id, region_id=excluded.region_id,
+               title_group=excluded.title_group""",
+        (name, pin_hash, role, home_store_id, region_id, title_group, datetime.now().isoformat(timespec="seconds")),
     )
     user_id = conn.execute("SELECT id FROM users WHERE name = ?", (name,)).fetchone()["id"]
     conn.execute("DELETE FROM user_stores WHERE user_id = ?", (user_id,))

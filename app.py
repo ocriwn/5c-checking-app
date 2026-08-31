@@ -93,7 +93,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
             pin_hash TEXT NOT NULL,
-            role TEXT NOT NULL CHECK(role IN ('store_manager','rm','admin')),
+            role TEXT NOT NULL,
             home_store_id INTEGER REFERENCES stores(id),
             region_id INTEGER REFERENCES regions(id),
             created_at TEXT NOT NULL
@@ -133,6 +133,36 @@ def init_db():
     cols = [r[1] for r in conn.execute("PRAGMA table_info(stores)").fetchall()]
     if "region_id" not in cols:
         conn.execute("ALTER TABLE stores ADD COLUMN region_id INTEGER REFERENCES regions(id)")
+    user_cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "title_group" not in user_cols:
+        # 'SM' (store/senior/assistant store manager) or 'Supervisor' (sales supervisor); NULL for rm/admin/viewer
+        conn.execute("ALTER TABLE users ADD COLUMN title_group TEXT")
+
+    # Older databases were created with a CHECK(role IN ('store_manager','rm','admin'))
+    # constraint that blocks the newer 'viewer' role. SQLite can't ALTER a CHECK, so
+    # rebuild the table without one if that constraint is still present.
+    create_sql = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='users'"
+    ).fetchone()[0]
+    if "CHECK" in create_sql:
+        conn.executescript(
+            """
+            ALTER TABLE users RENAME TO users_old;
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                pin_hash TEXT NOT NULL,
+                role TEXT NOT NULL,
+                home_store_id INTEGER REFERENCES stores(id),
+                region_id INTEGER REFERENCES regions(id),
+                title_group TEXT,
+                created_at TEXT NOT NULL
+            );
+            INSERT INTO users (id, name, pin_hash, role, home_store_id, region_id, title_group, created_at)
+                SELECT id, name, pin_hash, role, home_store_id, region_id, title_group, created_at FROM users_old;
+            DROP TABLE users_old;
+            """
+        )
     conn.commit()
     conn.close()
 
@@ -191,7 +221,7 @@ def user_public(user):
 def view_scope_store_ids(user):
     """Store ids this user may VIEW history/analytics for. None = unrestricted (admin)."""
     db = get_db()
-    if user["role"] == "admin":
+    if user["role"] in ("admin", "viewer"):
         return None
     if user["role"] == "rm":
         return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (user["region_id"],))]
@@ -201,7 +231,7 @@ def view_scope_store_ids(user):
 def submit_scope_store_ids(user):
     """Store ids this user may SUBMIT an observation for. None = unrestricted (admin)."""
     db = get_db()
-    if user["role"] == "admin":
+    if user["role"] in ("admin", "viewer"):
         return None
     if user["role"] == "rm":
         return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (user["region_id"],))]
@@ -290,6 +320,19 @@ def api_user_names():
     return jsonify([r["name"] for r in rows])
 
 
+@app.route("/api/users/directory")
+def api_user_directory():
+    """Login screen data: every account with enough info (region, role,
+    SM-vs-Supervisor) to group the picker so 75+ names aren't one flat list."""
+    db = get_db()
+    rows = db.execute(
+        """SELECT u.name, u.role, u.title_group, r.name AS region_name
+           FROM users u LEFT JOIN regions r ON r.id = u.region_id
+           ORDER BY u.name"""
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
 @app.route("/api/login", methods=["POST"])
 def api_login():
     db = get_db()
@@ -335,8 +378,11 @@ def api_admin_add_user():
         store_names = [single] if single else []
     store_names = [s.strip() for s in store_names if s and s.strip()]
     region_name = (payload.get("region_name") or "").strip() or None
+    title_group = payload.get("title_group") or None
+    if title_group not in ("SM", "Supervisor", None):
+        return jsonify({"error": "title_group 只能是 SM 或 Supervisor"}), 400
 
-    if not name or not pin or role not in ("store_manager", "rm", "admin"):
+    if not name or not pin or role not in ("store_manager", "rm", "admin", "viewer"):
         return jsonify({"error": "缺少必要欄位或角色不正確"}), 400
 
     region_id = None
@@ -359,11 +405,12 @@ def api_admin_add_user():
 
     pin_hash = generate_password_hash(pin, method="pbkdf2:sha256")
     db.execute(
-        """INSERT INTO users (name, pin_hash, role, home_store_id, region_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)
+        """INSERT INTO users (name, pin_hash, role, home_store_id, region_id, title_group, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(name) DO UPDATE SET pin_hash=excluded.pin_hash, role=excluded.role,
-               home_store_id=excluded.home_store_id, region_id=excluded.region_id""",
-        (name, pin_hash, role, home_store_id, region_id, datetime.now().isoformat(timespec="seconds")),
+               home_store_id=excluded.home_store_id, region_id=excluded.region_id,
+               title_group=excluded.title_group""",
+        (name, pin_hash, role, home_store_id, region_id, title_group, datetime.now().isoformat(timespec="seconds")),
     )
     user_id = db.execute("SELECT id FROM users WHERE name = ?", (name,)).fetchone()["id"]
     db.execute("DELETE FROM user_stores WHERE user_id = ?", (user_id,))
@@ -395,14 +442,34 @@ def api_stores():
 
     for_scope = request.args.get("for")
     ids = submit_scope_store_ids(g.user) if for_scope == "submit" else view_scope_store_ids(g.user)
+    base_query = """SELECT s.id, s.name, r.name AS region_name FROM stores s
+                     LEFT JOIN regions r ON r.id = s.region_id"""
     if ids is None:
-        rows = db.execute("SELECT id, name FROM stores ORDER BY name").fetchall()
+        rows = db.execute(base_query + " ORDER BY r.name, s.name").fetchall()
     elif not ids:
         rows = []
     else:
         placeholders = ",".join("?" * len(ids))
-        rows = db.execute(f"SELECT id, name FROM stores WHERE id IN ({placeholders}) ORDER BY name", ids).fetchall()
+        rows = db.execute(base_query + f" WHERE s.id IN ({placeholders}) ORDER BY r.name, s.name", ids).fetchall()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/admin/stores/<int:store_id>", methods=["PATCH"])
+@admin_required
+def api_admin_rename_store(store_id):
+    db = get_db()
+    new_name = (request.json or {}).get("name", "").strip()
+    if not new_name:
+        return jsonify({"error": UI_STRINGS["zh-TW"]["err_store_name_required"], "code": "store_name_required"}), 400
+    row = db.execute("SELECT id FROM stores WHERE id = ?", (store_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    try:
+        db.execute("UPDATE stores SET name = ? WHERE id = ?", (new_name, store_id))
+        db.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "門店名稱重複", "code": "store_name_required"}), 400
+    return jsonify({"ok": True, "id": store_id, "name": new_name})
 
 
 @app.route("/api/employees")

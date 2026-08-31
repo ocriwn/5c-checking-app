@@ -221,20 +221,43 @@ async function loadStoresInto(selectEl, includeAllOption, labelAll, endpoint = "
   const stores = await api(endpoint);
   if (endpoint === "/api/stores?for=submit") state.submitStores = stores;
   else state.stores = stores;
-  selectEl.querySelectorAll("option:not([data-keep])").forEach((o) => o.remove());
+  selectEl.innerHTML = "";
   if (includeAllOption) {
     const opt = document.createElement("option");
     opt.value = "";
     opt.textContent = labelAll;
-    opt.dataset.keep = "1";
     selectEl.appendChild(opt);
   }
-  stores.forEach((s) => {
-    const opt = document.createElement("option");
-    opt.value = s.id;
-    opt.textContent = s.name;
-    selectEl.appendChild(opt);
-  });
+
+  const regions = new Set(stores.map((s) => s.region_name).filter(Boolean));
+  if (regions.size > 1) {
+    const byRegion = new Map();
+    stores.forEach((s) => {
+      const key = s.region_name || "";
+      if (!byRegion.has(key)) byRegion.set(key, []);
+      byRegion.get(key).push(s);
+    });
+    Array.from(byRegion.keys())
+      .sort()
+      .forEach((region) => {
+        const group = document.createElement("optgroup");
+        group.label = region;
+        byRegion.get(region).forEach((s) => {
+          const opt = document.createElement("option");
+          opt.value = s.id;
+          opt.textContent = s.name;
+          group.appendChild(opt);
+        });
+        selectEl.appendChild(group);
+      });
+  } else {
+    stores.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      selectEl.appendChild(opt);
+    });
+  }
 }
 
 async function refreshAllStoreSelects() {
@@ -505,7 +528,7 @@ function showLogin() {
 }
 
 function renderUserLabel() {
-  const roleKey = { store_manager: "role_store_manager", rm: "role_rm", admin: "role_admin" }[state.user.role] || "";
+  const roleKey = { store_manager: "role_store_manager", rm: "role_rm", admin: "role_admin", viewer: "role_viewer" }[state.user.role] || "";
   const roleLabel = roleKey ? t(roleKey) : "";
   let scopeName = "";
   if (state.user.role === "rm") {
@@ -517,6 +540,48 @@ function renderUserLabel() {
   const scopePart = scopeName ? ` · ${scopeName}` : "";
   document.getElementById("user-label").textContent = `${t("logged_in_as")}${state.user.name}（${roleLabel}${scopePart}）`;
   document.getElementById("btn-add-store").hidden = state.user.role !== "admin";
+}
+
+async function populateLoginNames() {
+  const directory = await api("/api/users/directory");
+  const groups = new Map(); // label -> [names]
+  const regionOrder = ["北一區", "北二區", "中區", "南區"];
+
+  const pushTo = (label, name) => {
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(name);
+  };
+
+  directory.forEach((u) => {
+    if (u.role === "admin" || u.role === "viewer") {
+      pushTo(t("role_admin"), u.name);
+    } else if (u.role === "rm") {
+      pushTo("RM", u.name);
+    } else {
+      const region = u.region_name || "";
+      const sub = u.title_group === "Supervisor" ? "Supervisor" : "SM";
+      pushTo(`${region}・${sub}`, u.name);
+    }
+  });
+
+  const orderedLabels = [];
+  regionOrder.forEach((r) => {
+    orderedLabels.push(`${r}・SM`, `${r}・Supervisor`);
+  });
+  orderedLabels.push("RM", t("role_admin"));
+  // catch any region not in the known order (e.g. newly added ones)
+  Array.from(groups.keys()).forEach((label) => {
+    if (!orderedLabels.includes(label)) orderedLabels.push(label);
+  });
+
+  const sel = document.getElementById("login-name");
+  sel.innerHTML = orderedLabels
+    .filter((label) => groups.has(label))
+    .map((label) => {
+      const opts = groups.get(label).sort((a, b) => a.localeCompare(b)).map((n) => `<option value="${n}">${n}</option>`).join("");
+      return `<optgroup label="${label}">${opts}</optgroup>`;
+    })
+    .join("");
 }
 
 async function handleLogin(e) {
@@ -576,8 +641,7 @@ async function init() {
   document.getElementById("login-form").addEventListener("submit", handleLogin);
   document.getElementById("btn-logout").addEventListener("click", handleLogout);
 
-  const names = await api("/api/users/names");
-  document.getElementById("login-name").innerHTML = names.map((n) => `<option value="${n}">${n}</option>`).join("");
+  await populateLoginNames();
 
   const user = await api("/api/me").catch(() => null);
   if (user) {
