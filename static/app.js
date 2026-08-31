@@ -559,14 +559,14 @@ async function populateLoginNames() {
       pushTo("RM", u.name);
     } else {
       const region = u.region_name || "";
-      const sub = u.title_group === "Supervisor" ? "Supervisor" : "SM";
+      const sub = u.title_group === "Supervisor" ? "Supervisor" : "Store Manager";
       pushTo(`${region}・${sub}`, u.name);
     }
   });
 
   const orderedLabels = [];
   regionOrder.forEach((r) => {
-    orderedLabels.push(`${r}・SM`, `${r}・Supervisor`);
+    orderedLabels.push(`${r}・Store Manager`, `${r}・Supervisor`);
   });
   orderedLabels.push("RM", t("role_admin"));
   // catch any region not in the known order (e.g. newly added ones)
