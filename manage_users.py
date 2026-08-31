@@ -50,16 +50,19 @@ def assign_store(store_name, region_name):
     print(f"門店「{store_name}」已指定到區域「{region_name}」")
 
 
-def add_user(name, pin, role, store_name=None, region_name=None):
+def add_user(name, pin, role, store_names=None, region_name=None):
+    """store_names: list of store name strings (a store_manager may cover more than one)."""
     conn = db()
-    home_store_id = None
-    region_id = None
-    if store_name:
+    store_names = store_names or []
+    store_ids = []
+    for store_name in store_names:
         store = conn.execute("SELECT id, region_id FROM stores WHERE name = ?", (store_name,)).fetchone()
         if not store:
             print(f"找不到門店「{store_name}」")
             return
-        home_store_id = store["id"]
+        store_ids.append(store["id"])
+    home_store_id = store_ids[0] if store_ids else None
+    region_id = None
     if region_name:
         region = conn.execute("SELECT id FROM regions WHERE name = ?", (region_name,)).fetchone()
         if not region:
@@ -74,8 +77,14 @@ def add_user(name, pin, role, store_name=None, region_name=None):
                home_store_id=excluded.home_store_id, region_id=excluded.region_id""",
         (name, pin_hash, role, home_store_id, region_id, datetime.now().isoformat(timespec="seconds")),
     )
+    user_id = conn.execute("SELECT id FROM users WHERE name = ?", (name,)).fetchone()["id"]
+    conn.execute("DELETE FROM user_stores WHERE user_id = ?", (user_id,))
+    conn.executemany(
+        "INSERT OR IGNORE INTO user_stores (user_id, store_id) VALUES (?, ?)",
+        [(user_id, sid) for sid in store_ids],
+    )
     conn.commit()
-    print(f"帳號已建立/更新：{name}（角色：{role}，門店：{store_name}，區域：{region_name}，PIN：{pin}）")
+    print(f"帳號已建立/更新：{name}（角色：{role}，門店：{store_names}，區域：{region_name}，PIN：{pin}）")
 
 
 def list_all():
@@ -88,10 +97,16 @@ def list_all():
         print(f"  {r['id']}: {r['name']} (區域: {r['region_name']})")
     print("=== 帳號 ===")
     for r in conn.execute(
-        "SELECT u.*, s.name AS store_name, r.name AS region_name FROM users u "
-        "LEFT JOIN stores s ON s.id = u.home_store_id LEFT JOIN regions r ON r.id = u.region_id"
+        "SELECT u.*, r.name AS region_name FROM users u LEFT JOIN regions r ON r.id = u.region_id"
     ):
-        print(f"  {r['id']}: {r['name']} ({r['role']}) 門店:{r['store_name']} 區域:{r['region_name']}")
+        stores = [
+            row["name"]
+            for row in conn.execute(
+                "SELECT s.name FROM user_stores us JOIN stores s ON s.id = us.store_id WHERE us.user_id = ?",
+                (r["id"],),
+            )
+        ]
+        print(f"  {r['id']}: {r['name']} ({r['role']}) 門店:{stores or r['home_store_id']} 區域:{r['region_name']}")
 
 
 if __name__ == "__main__":
@@ -106,12 +121,13 @@ if __name__ == "__main__":
         assign_store(args[1], args[2])
     elif cmd == "add-user":
         name, pin, role = args[1], args[2], args[3]
-        store_name = region_name = None
+        store_names = []
+        region_name = None
         if "--store" in args:
-            store_name = args[args.index("--store") + 1]
+            store_names = [args[args.index("--store") + 1]]
         if "--region" in args:
             region_name = args[args.index("--region") + 1]
-        add_user(name, pin, role, store_name, region_name)
+        add_user(name, pin, role, store_names, region_name)
     elif cmd == "list":
         list_all()
     else:

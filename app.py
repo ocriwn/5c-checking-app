@@ -99,6 +99,12 @@ def init_db():
             created_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS user_stores (
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            store_id INTEGER NOT NULL REFERENCES stores(id),
+            PRIMARY KEY (user_id, store_id)
+        );
+
         CREATE TABLE IF NOT EXISTS evaluations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             eval_date TEXT NOT NULL,
@@ -141,15 +147,30 @@ def current_user():
     return dict(row) if row else None
 
 
+def user_store_ids(user):
+    """All store ids explicitly assigned to this store_manager (their full patch, may be >1)."""
+    db = get_db()
+    rows = db.execute("SELECT store_id FROM user_stores WHERE user_id = ?", (user["id"],)).fetchall()
+    ids = [r["store_id"] for r in rows]
+    if not ids and user.get("home_store_id"):
+        ids = [user["home_store_id"]]
+    return ids
+
+
 def user_public(user):
     db = get_db()
+    store_ids = user_store_ids(user)
+    stores = []
+    if store_ids:
+        placeholders = ",".join("?" * len(store_ids))
+        stores = [dict(r) for r in db.execute(f"SELECT id, name FROM stores WHERE id IN ({placeholders}) ORDER BY name", store_ids)]
     home_store_name = None
     if user.get("home_store_id"):
         r = db.execute("SELECT name FROM stores WHERE id = ?", (user["home_store_id"],)).fetchone()
         home_store_name = r["name"] if r else None
     region_id = user.get("region_id")
-    if not region_id and user.get("home_store_id"):
-        r = db.execute("SELECT region_id FROM stores WHERE id = ?", (user["home_store_id"],)).fetchone()
+    if not region_id and store_ids:
+        r = db.execute("SELECT region_id FROM stores WHERE id = ?", (store_ids[0],)).fetchone()
         region_id = r["region_id"] if r else None
     region_name = None
     if region_id:
@@ -161,6 +182,7 @@ def user_public(user):
         "role": user["role"],
         "home_store_id": user.get("home_store_id"),
         "home_store_name": home_store_name,
+        "stores": stores,
         "region_id": region_id,
         "region_name": region_name,
     }
@@ -173,7 +195,7 @@ def view_scope_store_ids(user):
         return None
     if user["role"] == "rm":
         return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (user["region_id"],))]
-    return [user["home_store_id"]]
+    return user_store_ids(user)
 
 
 def submit_scope_store_ids(user):
@@ -183,10 +205,14 @@ def submit_scope_store_ids(user):
         return None
     if user["role"] == "rm":
         return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (user["region_id"],))]
-    home = db.execute("SELECT region_id FROM stores WHERE id = ?", (user["home_store_id"],)).fetchone()
-    if not home or home["region_id"] is None:
-        return [user["home_store_id"]]
-    return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (home["region_id"],))]
+    store_ids = user_store_ids(user)
+    region_id = user.get("region_id")
+    if not region_id and store_ids:
+        r = db.execute("SELECT region_id FROM stores WHERE id = ?", (store_ids[0],)).fetchone()
+        region_id = r["region_id"] if r else None
+    if not region_id:
+        return store_ids
+    return [r["id"] for r in db.execute("SELECT id FROM stores WHERE region_id = ?", (region_id,))]
 
 
 def apply_view_scope(query, params, user, alias="e"):
@@ -296,13 +322,18 @@ def api_me():
 def api_admin_add_user():
     """Admin-only: create or update a store_manager/rm/admin account.
     Region/store are created on the fly by name if they don't exist yet,
-    so this one call is enough for "add manager X at store Y in region Z"."""
+    so this one call is enough for "add manager X at stores [Y,Z] in region W".
+    store_names may list more than one store (cluster/area managers)."""
     db = get_db()
     payload = request.json or {}
     name = (payload.get("name") or "").strip()
     pin = (payload.get("pin") or "").strip()
     role = payload.get("role")
-    store_name = (payload.get("store_name") or "").strip() or None
+    store_names = payload.get("store_names")
+    if store_names is None:
+        single = (payload.get("store_name") or "").strip()
+        store_names = [single] if single else []
+    store_names = [s.strip() for s in store_names if s and s.strip()]
     region_name = (payload.get("region_name") or "").strip() or None
 
     if not name or not pin or role not in ("store_manager", "rm", "admin"):
@@ -313,16 +344,18 @@ def api_admin_add_user():
         db.execute("INSERT OR IGNORE INTO regions (name) VALUES (?)", (region_name,))
         region_id = db.execute("SELECT id FROM regions WHERE name = ?", (region_name,)).fetchone()["id"]
 
-    home_store_id = None
-    if store_name:
+    store_ids = []
+    for store_name in store_names:
         row = db.execute("SELECT id FROM stores WHERE name = ?", (store_name,)).fetchone()
         if row:
-            home_store_id = row["id"]
+            sid = row["id"]
             if region_id:
-                db.execute("UPDATE stores SET region_id = ? WHERE id = ?", (region_id, home_store_id))
+                db.execute("UPDATE stores SET region_id = ? WHERE id = ?", (region_id, sid))
         else:
             cur = db.execute("INSERT INTO stores (name, region_id) VALUES (?, ?)", (store_name, region_id))
-            home_store_id = cur.lastrowid
+            sid = cur.lastrowid
+        store_ids.append(sid)
+    home_store_id = store_ids[0] if store_ids else None
 
     pin_hash = generate_password_hash(pin, method="pbkdf2:sha256")
     db.execute(
@@ -332,8 +365,14 @@ def api_admin_add_user():
                home_store_id=excluded.home_store_id, region_id=excluded.region_id""",
         (name, pin_hash, role, home_store_id, region_id, datetime.now().isoformat(timespec="seconds")),
     )
+    user_id = db.execute("SELECT id FROM users WHERE name = ?", (name,)).fetchone()["id"]
+    db.execute("DELETE FROM user_stores WHERE user_id = ?", (user_id,))
+    db.executemany(
+        "INSERT OR IGNORE INTO user_stores (user_id, store_id) VALUES (?, ?)",
+        [(user_id, sid) for sid in store_ids],
+    )
     db.commit()
-    return jsonify({"ok": True, "name": name, "role": role}), 201
+    return jsonify({"ok": True, "name": name, "role": role, "store_ids": store_ids}), 201
 
 
 @app.route("/api/stores", methods=["GET", "POST"])

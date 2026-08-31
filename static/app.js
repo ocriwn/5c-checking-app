@@ -507,7 +507,13 @@ function showLogin() {
 function renderUserLabel() {
   const roleKey = { store_manager: "role_store_manager", rm: "role_rm", admin: "role_admin" }[state.user.role] || "";
   const roleLabel = roleKey ? t(roleKey) : "";
-  const scopeName = state.user.role === "rm" ? state.user.region_name : state.user.home_store_name;
+  let scopeName = "";
+  if (state.user.role === "rm") {
+    scopeName = state.user.region_name || "";
+  } else if (state.user.role === "store_manager") {
+    const stores = state.user.stores || [];
+    scopeName = stores.length > 1 ? stores.map((s) => s.name).join("、") : state.user.home_store_name || "";
+  }
   const scopePart = scopeName ? ` · ${scopeName}` : "";
   document.getElementById("user-label").textContent = `${t("logged_in_as")}${state.user.name}（${roleLabel}${scopePart}）`;
   document.getElementById("btn-add-store").hidden = state.user.role !== "admin";
