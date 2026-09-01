@@ -217,6 +217,19 @@ function updateTotals() {
   gradeEl.className = `grade grade-${code}`;
 }
 
+const REGION_ORDER = ["北一區", "北二區", "中區", "南區"];
+
+function sortRegionKeys(keys) {
+  return keys.sort((a, b) => {
+    const ia = REGION_ORDER.indexOf(a);
+    const ib = REGION_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
 async function loadStoresInto(selectEl, includeAllOption, labelAll, endpoint = "/api/stores") {
   const stores = await api(endpoint);
   if (endpoint === "/api/stores?for=submit") state.submitStores = stores;
@@ -237,11 +250,10 @@ async function loadStoresInto(selectEl, includeAllOption, labelAll, endpoint = "
       if (!byRegion.has(key)) byRegion.set(key, []);
       byRegion.get(key).push(s);
     });
-    Array.from(byRegion.keys())
-      .sort()
+    sortRegionKeys(Array.from(byRegion.keys()))
       .forEach((region) => {
         const group = document.createElement("optgroup");
-        group.label = region;
+        group.label = region || "（未分區）";
         byRegion.get(region).forEach((s) => {
           const opt = document.createElement("option");
           opt.value = s.id;
