@@ -23,7 +23,10 @@
     <h2 data-i18n="login_title"></h2>
     <form id="login-form">
       <label><span data-i18n="login_name_label"></span>
-        <select id="login-name" required></select>
+        <div class="inline-add">
+          <select id="login-name-region" class="region-filter"></select>
+          <select id="login-name" required></select>
+        </div>
       </label>
       <label><span data-i18n="login_pin_label"></span>
         <input type="password" id="login-pin" inputmode="numeric" autocomplete="current-password" required data-i18n-placeholder="login_pin_placeholder">

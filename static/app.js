@@ -331,7 +331,7 @@ async function loadStoreEmployees(storeId) {
   }
   const list = await api(`/api/store-employees?store_id=${storeId}`);
   state.storeEmployees = list;
-  sel.innerHTML = `<option value="" disabled>${t("placeholder_employee")}</option>` +
+  sel.innerHTML = `<option value="">${t("placeholder_employee")}</option>` +
     list.map((e) => `<option value="${e.name}">${e.name}</option>`).join("");
   if (prevValue && list.some((e) => e.name === prevValue)) sel.value = prevValue;
   else sel.value = "";
@@ -629,8 +629,7 @@ function renderUserLabel() {
   document.getElementById("btn-add-store").hidden = state.user.role !== "admin";
 }
 
-async function populateLoginNames() {
-  const directory = await api("/api/users/directory");
+function renderLoginNameOptions(directory, filterKey) {
   const groups = new Map(); // label -> [names]
   const regionOrder = ["北一區", "北二區", "中區", "南區"];
 
@@ -640,6 +639,12 @@ async function populateLoginNames() {
   };
 
   directory.forEach((u) => {
+    let category;
+    if (u.role === "admin" || u.role === "viewer") category = "ADMIN";
+    else if (u.role === "rm") category = "RM";
+    else category = u.region_name || "";
+    if (filterKey && category !== filterKey) return;
+
     if (u.role === "admin" || u.role === "viewer") {
       pushTo(t("role_admin"), u.name);
     } else if (u.role === "rm") {
@@ -669,6 +674,34 @@ async function populateLoginNames() {
       return `<optgroup label="${label}">${opts}</optgroup>`;
     })
     .join("");
+}
+
+async function populateLoginNames() {
+  const directory = await api("/api/users/directory");
+  const regionOrder = ["北一區", "北二區", "中區", "南區"];
+
+  const categories = new Set();
+  directory.forEach((u) => {
+    if (u.role === "admin" || u.role === "viewer") categories.add("ADMIN");
+    else if (u.role === "rm") categories.add("RM");
+    else categories.add(u.region_name || "");
+  });
+
+  const filterSel = document.getElementById("login-name-region");
+  const filterOptions = [];
+  regionOrder.forEach((r) => {
+    if (categories.has(r)) filterOptions.push([r, r]);
+  });
+  if (categories.has("RM")) filterOptions.push(["RM", "RM"]);
+  if (categories.has("ADMIN")) filterOptions.push(["ADMIN", t("role_admin")]);
+  filterSel.innerHTML = `<option value="">${t("region_all")}</option>` +
+    filterOptions.map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+
+  renderLoginNameOptions(directory, filterSel.value);
+  if (!filterSel.dataset.wired) {
+    filterSel.addEventListener("change", () => renderLoginNameOptions(directory, filterSel.value));
+    filterSel.dataset.wired = "1";
+  }
 }
 
 async function handleLogin(e) {
