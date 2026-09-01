@@ -500,6 +500,24 @@ def api_admin_rename_store(store_id):
     return jsonify({"ok": True, "id": store_id, "name": new_name})
 
 
+@app.route("/api/admin/users/<int:user_id>", methods=["PATCH"])
+@admin_required
+def api_admin_rename_user(user_id):
+    db = get_db()
+    new_name = (request.json or {}).get("name", "").strip()
+    if not new_name:
+        return jsonify({"error": "缺少名稱"}), 400
+    row = db.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    try:
+        db.execute("UPDATE users SET name = ? WHERE id = ?", (new_name, user_id))
+        db.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "名稱重複", "code": "name_required"}), 400
+    return jsonify({"ok": True, "id": user_id, "name": new_name})
+
+
 @app.route("/api/employees")
 @login_required
 def api_employees():
