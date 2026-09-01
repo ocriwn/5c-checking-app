@@ -108,8 +108,16 @@
           </div>
         </label>
         <label><span data-i18n="field_evaluator"></span>
-          <input type="text" id="f-evaluator" list="evaluator-list" required data-i18n-placeholder="placeholder_evaluator">
-          <datalist id="evaluator-list"></datalist>
+          <div class="inline-add">
+            <select id="f-evaluator" required></select>
+            <button type="button" id="btn-add-evaluator" class="btn-ghost" data-i18n="btn_add_evaluator"></button>
+            <button type="button" id="btn-remove-evaluator" class="btn-ghost" data-i18n="btn_remove_evaluator"></button>
+          </div>
+          <div class="inline-add" id="new-evaluator-row" hidden>
+            <input type="text" id="new-evaluator-name" data-i18n-placeholder="placeholder_new_evaluator">
+            <button type="button" id="btn-confirm-evaluator" class="btn-ghost" data-i18n="btn_confirm_store"></button>
+            <button type="button" id="btn-cancel-evaluator" class="btn-ghost" data-i18n="btn_cancel_store"></button>
+          </div>
         </label>
       </div>
 

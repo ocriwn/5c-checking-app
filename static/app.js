@@ -310,10 +310,6 @@ async function refreshAllStoreSelects() {
 }
 
 async function refreshEmployeeDatalist() {
-  const evaluators = await api("/api/evaluators");
-  const dl2 = document.getElementById("evaluator-list");
-  dl2.innerHTML = evaluators.map((e) => `<option value="${e}">`).join("");
-
   const employees = await api("/api/employees");
   const hSel = document.getElementById("h-employee");
   hSel.innerHTML = `<option value="">${t("filter_employee_all")}</option>` + employees.map((e) => `<option value="${e}">${e}</option>`).join("");
@@ -322,19 +318,36 @@ async function refreshEmployeeDatalist() {
 }
 
 async function loadStoreEmployees(storeId) {
-  const sel = document.getElementById("f-employee");
-  const prevValue = sel.value;
+  const empSel = document.getElementById("f-employee");
+  const evalSel = document.getElementById("f-evaluator");
+  const prevEmpValue = empSel.value;
+  const prevEvalValue = evalSel.value;
   if (!storeId) {
-    sel.innerHTML = "";
+    empSel.innerHTML = "";
+    evalSel.innerHTML = "";
     state.storeEmployees = [];
     return;
   }
   const list = await api(`/api/store-employees?store_id=${storeId}`);
   state.storeEmployees = list;
-  sel.innerHTML = `<option value="">${t("placeholder_employee")}</option>` +
+
+  empSel.innerHTML = `<option value="">${t("placeholder_employee")}</option>` +
     list.map((e) => `<option value="${e.name}">${e.name}</option>`).join("");
-  if (prevValue && list.some((e) => e.name === prevValue)) sel.value = prevValue;
-  else sel.value = "";
+  if (prevEmpValue && list.some((e) => e.name === prevEmpValue)) empSel.value = prevEmpValue;
+  else empSel.value = "";
+
+  // 觀察人：預設本人（登入帳號＝以自己 SIC 身份評分），也可從門店名單挑選/新增
+  // 其他人（例如借用帳號登入的 SSA）。
+  const selfName = state.user.name;
+  const names = new Set(list.map((e) => e.name));
+  let evalOptions = names.has(selfName) ? "" : `<option value="${selfName}">${selfName}</option>`;
+  evalOptions += list.map((e) => `<option value="${e.name}">${e.name}</option>`).join("");
+  evalSel.innerHTML = evalOptions;
+  if (prevEvalValue && (prevEvalValue === selfName || list.some((e) => e.name === prevEvalValue))) {
+    evalSel.value = prevEvalValue;
+  } else {
+    evalSel.value = selfName;
+  }
 }
 
 function toggleNewEmployeeRow(show) {
@@ -362,6 +375,35 @@ async function handleRemoveEmployee() {
   const entry = (state.storeEmployees || []).find((e) => e.name === name);
   if (!entry) return;
   if (!confirm(`${t("confirm_remove_employee")}${name}？`)) return;
+  await api(`/api/store-employees/${entry.id}`, { method: "DELETE" });
+  await loadStoreEmployees(document.getElementById("f-store").value);
+}
+
+function toggleNewEvaluatorRow(show) {
+  document.getElementById("new-evaluator-row").hidden = !show;
+  document.getElementById("btn-add-evaluator").hidden = show;
+  document.getElementById("btn-remove-evaluator").hidden = show;
+  if (show) document.getElementById("new-evaluator-name").focus();
+  else document.getElementById("new-evaluator-name").value = "";
+}
+
+async function handleConfirmAddEvaluator() {
+  const name = document.getElementById("new-evaluator-name").value.trim();
+  const storeId = document.getElementById("f-store").value;
+  if (!name || !storeId) return;
+  await api("/api/store-employees", { method: "POST", body: JSON.stringify({ store_id: storeId, name }) });
+  await loadStoreEmployees(storeId);
+  document.getElementById("f-evaluator").value = name;
+  toggleNewEvaluatorRow(false);
+}
+
+async function handleRemoveEvaluator() {
+  const sel = document.getElementById("f-evaluator");
+  const name = sel.value;
+  if (!name || name === state.user.name) return;
+  const entry = (state.storeEmployees || []).find((e) => e.name === name);
+  if (!entry) return;
+  if (!confirm(`${t("confirm_remove_evaluator")}${name}？`)) return;
   await api(`/api/store-employees/${entry.id}`, { method: "DELETE" });
   await loadStoreEmployees(document.getElementById("f-store").value);
 }
@@ -406,6 +448,7 @@ function resetScoreForm() {
   document.querySelectorAll('#feelings-options input').forEach((b) => (b.checked = false));
   document.getElementById("f-overall-feedback").value = "";
   document.getElementById("f-employee").value = "";
+  document.getElementById("f-evaluator").value = state.user.name;
   updateTotals();
 }
 
@@ -744,6 +787,10 @@ async function enterApp(user) {
     document.getElementById("btn-cancel-employee").addEventListener("click", () => toggleNewEmployeeRow(false));
     document.getElementById("btn-confirm-employee").addEventListener("click", handleConfirmAddEmployee);
     document.getElementById("btn-remove-employee").addEventListener("click", handleRemoveEmployee);
+    document.getElementById("btn-add-evaluator").addEventListener("click", () => toggleNewEvaluatorRow(true));
+    document.getElementById("btn-cancel-evaluator").addEventListener("click", () => toggleNewEvaluatorRow(false));
+    document.getElementById("btn-confirm-evaluator").addEventListener("click", handleConfirmAddEvaluator);
+    document.getElementById("btn-remove-evaluator").addEventListener("click", handleRemoveEvaluator);
     document.getElementById("score-form").addEventListener("submit", handleSubmit);
     document.getElementById("btn-filter-history").addEventListener("click", loadHistory);
     document.getElementById("btn-refresh-analytics").addEventListener("click", refreshAnalytics);
