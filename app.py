@@ -494,18 +494,26 @@ def api_stores():
 @admin_required
 def api_admin_rename_store(store_id):
     db = get_db()
-    new_name = (request.json or {}).get("name", "").strip()
+    payload = request.json or {}
+    new_name = (payload.get("name") or "").strip()
+    region_name = (payload.get("region_name") or "").strip() or None
     if not new_name:
         return jsonify({"error": UI_STRINGS["zh-TW"]["err_store_name_required"], "code": "store_name_required"}), 400
     row = db.execute("SELECT id FROM stores WHERE id = ?", (store_id,)).fetchone()
     if not row:
         return jsonify({"error": "not found"}), 404
     try:
-        db.execute("UPDATE stores SET name = ? WHERE id = ?", (new_name, store_id))
+        region_id = None
+        if region_name:
+            db.execute("INSERT OR IGNORE INTO regions (name) VALUES (?)", (region_name,))
+            region_id = db.execute("SELECT id FROM regions WHERE name = ?", (region_name,)).fetchone()["id"]
+            db.execute("UPDATE stores SET name = ?, region_id = ? WHERE id = ?", (new_name, region_id, store_id))
+        else:
+            db.execute("UPDATE stores SET name = ? WHERE id = ?", (new_name, store_id))
         db.commit()
     except sqlite3.IntegrityError:
         return jsonify({"error": "門店名稱重複", "code": "store_name_required"}), 400
-    return jsonify({"ok": True, "id": store_id, "name": new_name})
+    return jsonify({"ok": True, "id": store_id, "name": new_name, "region_name": region_name})
 
 
 @app.route("/api/admin/users/<int:user_id>", methods=["PATCH"])
