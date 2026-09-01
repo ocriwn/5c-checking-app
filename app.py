@@ -516,6 +516,36 @@ def api_admin_rename_store(store_id):
     return jsonify({"ok": True, "id": store_id, "name": new_name, "region_name": region_name})
 
 
+@app.route("/api/admin/stores/<int:store_id>", methods=["DELETE"])
+@admin_required
+def api_admin_delete_store(store_id):
+    """Permanently deletes a store AND any evaluations recorded against it.
+    Requires confirm_delete_evaluations: true in the body as a guard against
+    accidental data loss, since evaluations have no cascade-delete from stores."""
+    db = get_db()
+    payload = request.json or {}
+    row = db.execute("SELECT id, name FROM stores WHERE id = ?", (store_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    eval_count = db.execute("SELECT COUNT(*) FROM evaluations WHERE store_id = ?", (store_id,)).fetchone()[0]
+    if eval_count and not payload.get("confirm_delete_evaluations"):
+        return jsonify({
+            "error": f"此門店有 {eval_count} 筆評分紀錄，需要 confirm_delete_evaluations: true 才會一併刪除",
+            "code": "confirm_required",
+            "eval_count": eval_count,
+        }), 400
+    try:
+        db.execute("DELETE FROM evaluations WHERE store_id = ?", (store_id,))
+        db.execute("DELETE FROM user_stores WHERE store_id = ?", (store_id,))
+        db.execute("UPDATE users SET home_store_id = NULL WHERE home_store_id = ?", (store_id,))
+        db.execute("DELETE FROM stores WHERE id = ?", (store_id,))
+        db.commit()
+    except sqlite3.IntegrityError as exc:
+        db.rollback()
+        return jsonify({"error": str(exc), "code": "server_error"}), 500
+    return jsonify({"ok": True, "id": store_id, "name": row["name"], "evaluations_deleted": eval_count})
+
+
 @app.route("/api/admin/users/<int:user_id>", methods=["PATCH"])
 @admin_required
 def api_admin_rename_user(user_id):
