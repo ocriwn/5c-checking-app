@@ -230,10 +230,8 @@ function sortRegionKeys(keys) {
   });
 }
 
-async function loadStoresInto(selectEl, includeAllOption, labelAll, endpoint = "/api/stores") {
-  const stores = await api(endpoint);
-  if (endpoint === "/api/stores?for=submit") state.submitStores = stores;
-  else state.stores = stores;
+function renderStoreOptions(selectEl, stores, includeAllOption, labelAll, regionFilter) {
+  const prevValue = selectEl.value;
   selectEl.innerHTML = "";
   if (includeAllOption) {
     const opt = document.createElement("option");
@@ -242,10 +240,11 @@ async function loadStoresInto(selectEl, includeAllOption, labelAll, endpoint = "
     selectEl.appendChild(opt);
   }
 
-  const regions = new Set(stores.map((s) => s.region_name).filter(Boolean));
+  const filtered = regionFilter ? stores.filter((s) => (s.region_name || "") === regionFilter) : stores;
+  const regions = new Set(filtered.map((s) => s.region_name).filter(Boolean));
   if (regions.size > 1) {
     const byRegion = new Map();
-    stores.forEach((s) => {
+    filtered.forEach((s) => {
       const key = s.region_name || "";
       if (!byRegion.has(key)) byRegion.set(key, []);
       byRegion.get(key).push(s);
@@ -263,12 +262,44 @@ async function loadStoresInto(selectEl, includeAllOption, labelAll, endpoint = "
         selectEl.appendChild(group);
       });
   } else {
-    stores.forEach((s) => {
+    filtered.forEach((s) => {
       const opt = document.createElement("option");
       opt.value = s.id;
       opt.textContent = s.name;
       selectEl.appendChild(opt);
     });
+  }
+
+  if (prevValue && filtered.some((s) => String(s.id) === prevValue)) selectEl.value = prevValue;
+  selectEl.dispatchEvent(new Event("change"));
+}
+
+function renderRegionFilter(regionSelectEl, stores) {
+  const prevValue = regionSelectEl.value;
+  const regions = sortRegionKeys(Array.from(new Set(stores.map((s) => s.region_name).filter(Boolean))));
+  regionSelectEl.innerHTML = `<option value="">${t("region_all")}</option>` +
+    regions.map((r) => `<option value="${r}">${r}</option>`).join("");
+  if (prevValue && regions.includes(prevValue)) regionSelectEl.value = prevValue;
+}
+
+async function loadStoresInto(selectEl, includeAllOption, labelAll, endpoint = "/api/stores") {
+  const stores = await api(endpoint);
+  if (endpoint === "/api/stores?for=submit") state.submitStores = stores;
+  else state.stores = stores;
+  selectEl._storesData = stores;
+
+  const regionSelectEl = document.getElementById(`${selectEl.id}-region`);
+  if (regionSelectEl) {
+    renderRegionFilter(regionSelectEl, stores);
+    if (!regionSelectEl.dataset.wired) {
+      regionSelectEl.addEventListener("change", () => {
+        renderStoreOptions(selectEl, selectEl._storesData || [], includeAllOption, labelAll, regionSelectEl.value);
+      });
+      regionSelectEl.dataset.wired = "1";
+    }
+    renderStoreOptions(selectEl, stores, includeAllOption, labelAll, regionSelectEl.value);
+  } else {
+    renderStoreOptions(selectEl, stores, includeAllOption, labelAll, "");
   }
 }
 
@@ -279,17 +310,60 @@ async function refreshAllStoreSelects() {
 }
 
 async function refreshEmployeeDatalist() {
-  const employees = await api("/api/employees");
-  const dl = document.getElementById("employee-list");
-  dl.innerHTML = employees.map((e) => `<option value="${e}">`).join("");
   const evaluators = await api("/api/evaluators");
   const dl2 = document.getElementById("evaluator-list");
   dl2.innerHTML = evaluators.map((e) => `<option value="${e}">`).join("");
 
+  const employees = await api("/api/employees");
   const hSel = document.getElementById("h-employee");
   hSel.innerHTML = `<option value="">${t("filter_employee_all")}</option>` + employees.map((e) => `<option value="${e}">${e}</option>`).join("");
   const aSel = document.getElementById("a-employee");
   aSel.innerHTML = `<option value="">${t("select_employee_placeholder")}</option>` + employees.map((e) => `<option value="${e}">${e}</option>`).join("");
+}
+
+async function loadStoreEmployees(storeId) {
+  const sel = document.getElementById("f-employee");
+  const prevValue = sel.value;
+  if (!storeId) {
+    sel.innerHTML = "";
+    state.storeEmployees = [];
+    return;
+  }
+  const list = await api(`/api/store-employees?store_id=${storeId}`);
+  state.storeEmployees = list;
+  sel.innerHTML = `<option value="" disabled>${t("placeholder_employee")}</option>` +
+    list.map((e) => `<option value="${e.name}">${e.name}</option>`).join("");
+  if (prevValue && list.some((e) => e.name === prevValue)) sel.value = prevValue;
+  else sel.value = "";
+}
+
+function toggleNewEmployeeRow(show) {
+  document.getElementById("new-employee-row").hidden = !show;
+  document.getElementById("btn-add-employee").hidden = show;
+  document.getElementById("btn-remove-employee").hidden = show;
+  if (show) document.getElementById("new-employee-name").focus();
+  else document.getElementById("new-employee-name").value = "";
+}
+
+async function handleConfirmAddEmployee() {
+  const name = document.getElementById("new-employee-name").value.trim();
+  const storeId = document.getElementById("f-store").value;
+  if (!name || !storeId) return;
+  await api("/api/store-employees", { method: "POST", body: JSON.stringify({ store_id: storeId, name }) });
+  await loadStoreEmployees(storeId);
+  document.getElementById("f-employee").value = name;
+  toggleNewEmployeeRow(false);
+}
+
+async function handleRemoveEmployee() {
+  const sel = document.getElementById("f-employee");
+  const name = sel.value;
+  if (!name) return;
+  const entry = (state.storeEmployees || []).find((e) => e.name === name);
+  if (!entry) return;
+  if (!confirm(`${t("confirm_remove_employee")}${name}？`)) return;
+  await api(`/api/store-employees/${entry.id}`, { method: "DELETE" });
+  await loadStoreEmployees(document.getElementById("f-store").value);
 }
 
 function toggleNewStoreRow(show) {
@@ -305,6 +379,7 @@ async function handleConfirmAddStore() {
   await api("/api/stores", { method: "POST", body: JSON.stringify({ name }) });
   await refreshAllStoreSelects();
   document.getElementById("f-store").value = state.submitStores.find((s) => s.name === name)?.id || "";
+  await loadStoreEmployees(document.getElementById("f-store").value);
   toggleNewStoreRow(false);
 }
 
@@ -631,6 +706,11 @@ async function enterApp(user) {
     document.getElementById("btn-add-store").addEventListener("click", () => toggleNewStoreRow(true));
     document.getElementById("btn-cancel-store").addEventListener("click", () => toggleNewStoreRow(false));
     document.getElementById("btn-confirm-store").addEventListener("click", handleConfirmAddStore);
+    document.getElementById("f-store").addEventListener("change", (e) => loadStoreEmployees(e.target.value));
+    document.getElementById("btn-add-employee").addEventListener("click", () => toggleNewEmployeeRow(true));
+    document.getElementById("btn-cancel-employee").addEventListener("click", () => toggleNewEmployeeRow(false));
+    document.getElementById("btn-confirm-employee").addEventListener("click", handleConfirmAddEmployee);
+    document.getElementById("btn-remove-employee").addEventListener("click", handleRemoveEmployee);
     document.getElementById("score-form").addEventListener("submit", handleSubmit);
     document.getElementById("btn-filter-history").addEventListener("click", loadHistory);
     document.getElementById("btn-refresh-analytics").addEventListener("click", refreshAnalytics);

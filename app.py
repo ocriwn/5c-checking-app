@@ -119,6 +119,14 @@ def init_db():
             created_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS store_employees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(store_id, name)
+        );
+
         CREATE TABLE IF NOT EXISTS evaluation_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             evaluation_id INTEGER NOT NULL REFERENCES evaluations(id) ON DELETE CASCADE,
@@ -543,6 +551,49 @@ def api_evaluators():
     query += " ORDER BY evaluator_name"
     rows = db.execute(query, params).fetchall()
     return jsonify([r["evaluator_name"] for r in rows])
+
+
+@app.route("/api/store-employees", methods=["GET", "POST"])
+@login_required
+def api_store_employees():
+    db = get_db()
+    store_id = request.args.get("store_id") if request.method == "GET" else (request.json or {}).get("store_id")
+    if not store_id:
+        return jsonify({"error": "缺少門店"}), 400
+    store_id = int(store_id)
+    allowed = submit_scope_store_ids(g.user)
+    if allowed is not None and store_id not in allowed:
+        return jsonify({"error": "沒有權限", "code": "forbidden"}), 403
+
+    if request.method == "POST":
+        name = ((request.json or {}).get("name") or "").strip()
+        if not name:
+            return jsonify({"error": "缺少姓名"}), 400
+        db.execute(
+            "INSERT OR IGNORE INTO store_employees (store_id, name, created_at) VALUES (?, ?, ?)",
+            (store_id, name, datetime.now().isoformat(timespec="seconds")),
+        )
+        db.commit()
+
+    rows = db.execute(
+        "SELECT id, name FROM store_employees WHERE store_id = ? ORDER BY name", (store_id,)
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/store-employees/<int:employee_id>", methods=["DELETE"])
+@login_required
+def api_delete_store_employee(employee_id):
+    db = get_db()
+    row = db.execute("SELECT store_id FROM store_employees WHERE id = ?", (employee_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    allowed = submit_scope_store_ids(g.user)
+    if allowed is not None and row["store_id"] not in allowed:
+        return jsonify({"error": "沒有權限", "code": "forbidden"}), 403
+    db.execute("DELETE FROM store_employees WHERE id = ?", (employee_id,))
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/evaluations", methods=["GET", "POST"])
