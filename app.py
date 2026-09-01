@@ -163,6 +163,30 @@ def init_db():
             DROP TABLE users_old;
             """
         )
+
+    # NOTE: SQLite auto-rewrites foreign keys in OTHER tables (here,
+    # user_stores.user_id REFERENCES users(id)) to point at the *new* name
+    # whenever the table they reference is renamed. The users-table rebuild
+    # above (this run or a past deploy) can leave user_stores referencing a
+    # since-dropped users_old. Checked independently of the CHECK migration
+    # above so it still repairs an already-broken user_stores even once
+    # that CHECK is gone. Cheap and idempotent, so just always verify.
+    user_stores_sql = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='user_stores'"
+    ).fetchone()[0]
+    if "users_old" in user_stores_sql:
+        conn.executescript(
+            """
+            ALTER TABLE user_stores RENAME TO user_stores_old;
+            CREATE TABLE user_stores (
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                store_id INTEGER NOT NULL REFERENCES stores(id),
+                PRIMARY KEY (user_id, store_id)
+            );
+            INSERT INTO user_stores (user_id, store_id) SELECT user_id, store_id FROM user_stores_old;
+            DROP TABLE user_stores_old;
+            """
+        )
     conn.commit()
     conn.close()
 
@@ -423,9 +447,7 @@ def api_admin_add_user():
         return jsonify({"ok": True, "name": name, "role": role, "store_ids": store_ids}), 201
     except Exception as exc:
         db.rollback()
-        # TEMPORARY: surface the real error while we debug a production-only 500.
-        import traceback
-        return jsonify({"error": str(exc), "traceback": traceback.format_exc()}), 500
+        return jsonify({"error": str(exc), "code": "server_error"}), 500
 
 
 @app.route("/api/stores", methods=["GET", "POST"])
