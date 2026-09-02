@@ -452,11 +452,228 @@ function resetScoreForm() {
   updateTotals();
 }
 
+// ---------- Score card image export ----------
+const FONT_SANS = "'PingFang TC', 'Microsoft JhengHei', 'Helvetica Neue', Arial, sans-serif";
+const FONT_SERIF = "Georgia, 'Noto Serif TC', 'PMingLiU', serif";
+const GRADE_COLORS = { excellent: "#4b6043", pass: "#8a7346", growing: "#8a4b32" };
+
+function wrapCanvasText(ctx, text, maxWidth) {
+  const tokens = String(text).match(/[A-Za-z0-9.,%:;()\/\-']+|./gs) || [];
+  const lines = [];
+  let cur = "";
+  for (const tok of tokens) {
+    const test = cur + tok;
+    if (cur && ctx.measureText(test).width > maxWidth) {
+      lines.push(cur);
+      cur = tok;
+    } else {
+      cur = test;
+    }
+  }
+  lines.push(cur);
+  return lines;
+}
+
+function renderScoreCardLayout(ctx, d, draw) {
+  const W = 900;
+  const PAD = 36;
+  const contentW = W - PAD * 2;
+  let y = PAD;
+
+  const grouped = {};
+  (d.items || []).forEach((it) => {
+    grouped[it.category] = grouped[it.category] || [];
+    grouped[it.category].push(it);
+  });
+
+  if (draw) {
+    ctx.fillStyle = "#faf7f2";
+    ctx.fillRect(0, 0, W, ctx.canvas.height);
+    ctx.fillStyle = "#13233c";
+    ctx.fillRect(0, 0, W, 8);
+  }
+
+  ctx.font = `600 13px ${FONT_SERIF}`;
+  ctx.fillStyle = "#8a7346";
+  if (draw) ctx.fillText("RALPH LAUREN", PAD, y + 30);
+  y += 32;
+
+  ctx.font = `700 26px ${FONT_SERIF}`;
+  ctx.fillStyle = "#13233c";
+  if (draw) ctx.fillText("5C Role Play 評分紀錄", PAD, y + 20);
+  y += 44;
+
+  ctx.font = `14px ${FONT_SANS}`;
+  ctx.fillStyle = "#444";
+  const metaLine = `${d.eval_date}　${d.store_name}　${d.employee_name}`;
+  if (draw) ctx.fillText(metaLine, PAD, y + 14);
+  y += 22;
+  const metaLine2 = `Role Play 觀察人：${d.evaluator_name}`;
+  if (draw) ctx.fillText(metaLine2, PAD, y + 14);
+  y += 36;
+
+  ctx.font = `700 32px ${FONT_SERIF}`;
+  ctx.fillStyle = "#13233c";
+  const scoreText = `${d.total_score} / ${d.max_score}`;
+  if (draw) ctx.fillText(scoreText, PAD, y + 26);
+  const scoreW = ctx.measureText(scoreText).width;
+
+  ctx.font = `600 16px ${FONT_SANS}`;
+  ctx.fillStyle = GRADE_COLORS[d.grade] || "#8a7346";
+  if (draw) ctx.fillText(gradeLabel(d.grade), PAD + scoreW + 16, y + 22);
+  y += 48;
+
+  if (d.overall_feelings && d.overall_feelings.length) {
+    ctx.font = `13px ${FONT_SANS}`;
+    ctx.fillStyle = "#666";
+    const feelLines = wrapCanvasText(ctx, `${t("detail_feelings_label")}${d.overall_feelings.join("、")}`, contentW);
+    feelLines.forEach((line) => {
+      if (draw) ctx.fillText(line, PAD, y + 12);
+      y += 20;
+    });
+  }
+  y += 8;
+
+  if (draw) {
+    ctx.strokeStyle = "#d8cdb8";
+    ctx.beginPath();
+    ctx.moveTo(PAD, y);
+    ctx.lineTo(W - PAD, y);
+    ctx.stroke();
+  }
+  y += 20;
+
+  CATEGORY_ORDER.forEach((cat) => {
+    const items = grouped[cat] || [];
+    if (!items.length) return;
+    const catName = state.rubric.categories.find((c) => c.key === cat)?.name || cat;
+
+    if (draw) {
+      ctx.fillStyle = CATEGORY_COLORS[cat] || "#13233c";
+      ctx.fillRect(PAD, y, 4, 22);
+    }
+    ctx.font = `700 16px ${FONT_SANS}`;
+    ctx.fillStyle = "#13233c";
+    if (draw) ctx.fillText(catName, PAD + 12, y + 16);
+    y += 32;
+
+    items.forEach((it) => {
+      const rubricItem = state.rubric.categories.find((c) => c.key === cat)?.items.find((i) => i.id === it.item_id);
+      const text = rubricItem ? rubricItem.text : it.item_id;
+      const checked = it.actual_score > 0;
+
+      ctx.font = `14px ${FONT_SANS}`;
+      const scoreLabel = `${it.actual_score}/${it.max_score}`;
+      const scoreLabelW = ctx.measureText(scoreLabel).width;
+      const itemTextW = contentW - 24 - scoreLabelW - 12;
+      const lines = wrapCanvasText(ctx, text, itemTextW);
+
+      if (draw) {
+        ctx.fillStyle = checked ? "#4b6043" : "#b7b0a3";
+        ctx.fillText(checked ? "✓" : "－", PAD, y + 12);
+        ctx.fillStyle = "#222";
+      }
+      lines.forEach((line, i) => {
+        if (draw) ctx.fillText(line, PAD + 20, y + 12 + i * 20);
+      });
+      if (draw) {
+        ctx.fillStyle = "#666";
+        ctx.font = `13px ${FONT_SANS}`;
+        ctx.textAlign = "right";
+        ctx.fillText(scoreLabel, W - PAD, y + 12);
+        ctx.textAlign = "left";
+      }
+      y += Math.max(20, lines.length * 20);
+
+      if (it.feedback) {
+        ctx.font = `italic 13px ${FONT_SANS}`;
+        const fbLines = wrapCanvasText(ctx, `→ ${it.feedback}`, contentW - 20);
+        fbLines.forEach((line) => {
+          if (draw) {
+            ctx.fillStyle = "#8a7346";
+            ctx.fillText(line, PAD + 20, y + 10);
+          }
+          y += 18;
+        });
+      }
+      y += 6;
+    });
+    y += 10;
+  });
+
+  if (d.overall_feedback) {
+    y += 4;
+    if (draw) {
+      ctx.strokeStyle = "#d8cdb8";
+      ctx.beginPath();
+      ctx.moveTo(PAD, y);
+      ctx.lineTo(W - PAD, y);
+      ctx.stroke();
+    }
+    y += 20;
+    ctx.font = `700 14px ${FONT_SANS}`;
+    ctx.fillStyle = "#13233c";
+    if (draw) ctx.fillText(t("field_overall_feedback"), PAD, y + 12);
+    y += 24;
+    ctx.font = `14px ${FONT_SANS}`;
+    ctx.fillStyle = "#333";
+    const fbLines = wrapCanvasText(ctx, d.overall_feedback, contentW);
+    fbLines.forEach((line) => {
+      if (draw) ctx.fillText(line, PAD, y + 12);
+      y += 20;
+    });
+  }
+
+  y += 30;
+  return y;
+}
+
+function renderScoreCardImage(d) {
+  const measureCanvas = document.createElement("canvas");
+  measureCanvas.width = 900;
+  measureCanvas.height = 10;
+  const measureCtx = measureCanvas.getContext("2d");
+  const totalHeight = Math.ceil(renderScoreCardLayout(measureCtx, d, false));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 900;
+  canvas.height = totalHeight;
+  const ctx = canvas.getContext("2d");
+  renderScoreCardLayout(ctx, d, true);
+  return canvas;
+}
+
+function downloadCanvasAsImage(canvas, filename) {
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, "image/png");
+}
+
+function safeFilenamePart(s) {
+  return String(s).replace(/[\\/:*?"<>|]/g, "_");
+}
+
+async function exportEvaluationImage(evaluationId) {
+  const d = await api(`/api/evaluations/${evaluationId}`);
+  const canvas = renderScoreCardImage(d);
+  const filename = `5C_${safeFilenamePart(d.eval_date)}_${safeFilenamePart(d.store_name)}_${safeFilenamePart(d.employee_name)}.png`;
+  downloadCanvasAsImage(canvas, filename);
+}
+
 async function handleSubmit(e) {
   e.preventDefault();
   const msg = document.getElementById("submit-msg");
+  const exportBtn = document.getElementById("btn-export-image");
   msg.textContent = "";
   msg.className = "submit-msg";
+  exportBtn.hidden = true;
 
   const payload = {
     eval_date: document.getElementById("f-date").value,
@@ -472,6 +689,8 @@ async function handleSubmit(e) {
     const result = await api("/api/evaluations", { method: "POST", body: JSON.stringify(payload) });
     msg.textContent = `${t("msg_saved_prefix")} ${result.total_score} / ${result.max_score}${t("msg_saved_grade")}${gradeLabel(result.grade)}`;
     msg.className = "submit-msg success";
+    exportBtn.hidden = false;
+    exportBtn.onclick = () => exportEvaluationImage(result.id);
     resetScoreForm();
     refreshEmployeeDatalist();
   } catch (err) {
@@ -531,7 +750,9 @@ async function showHistoryDetail(id) {
       html += `<div class="detail-item"><div class="txt">${text}${it.feedback ? `<br><em>${t("detail_item_feedback_label")}${it.feedback}</em>` : ""}</div><div class="sc">${it.actual_score} / ${it.max_score}</div></div>`;
     });
   });
+  html += `<button type="button" id="btn-export-detail-image" class="btn-ghost">${t("btn_export_image")}</button>`;
   panel.innerHTML = html;
+  document.getElementById("btn-export-detail-image").addEventListener("click", () => exportEvaluationImage(id));
 }
 
 // ---------- Analytics ----------
