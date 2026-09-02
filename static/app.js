@@ -328,7 +328,10 @@ async function loadStoreEmployees(storeId) {
     state.storeEmployees = [];
     return;
   }
-  const list = await api(`/api/store-employees?store_id=${storeId}`);
+  const [list, sicNames] = await Promise.all([
+    api(`/api/store-employees?store_id=${storeId}`),
+    api(`/api/stores/${storeId}/sic`),
+  ]);
   state.storeEmployees = list;
 
   empSel.innerHTML = `<option value="">${t("placeholder_employee")}</option>` +
@@ -336,17 +339,32 @@ async function loadStoreEmployees(storeId) {
   if (prevEmpValue && list.some((e) => e.name === prevEmpValue)) empSel.value = prevEmpValue;
   else empSel.value = "";
 
-  // 觀察人：預設本人（登入帳號＝以自己 SIC 身份評分），也可從門店名單挑選/新增
-  // 其他人（例如借用帳號登入的 SSA）。
+  // 觀察人：預設代入該店的 SIC（店經理／Supervisor 帳號），若本人就是其中之一
+  // 則優先選自己；也可從門店員工名單挑選/新增其他人（例如借用帳號登入的 SSA）。
   const selfName = state.user.name;
-  const names = new Set(list.map((e) => e.name));
-  let evalOptions = names.has(selfName) ? "" : `<option value="${selfName}">${selfName}</option>`;
-  evalOptions += list.map((e) => `<option value="${e.name}">${e.name}</option>`).join("");
+  const seen = new Set();
+  let evalOptions = "";
+  sicNames.forEach((n) => {
+    if (seen.has(n)) return;
+    seen.add(n);
+    evalOptions += `<option value="${n}">${n}</option>`;
+  });
+  if (!seen.has(selfName)) {
+    seen.add(selfName);
+    evalOptions += `<option value="${selfName}">${selfName}</option>`;
+  }
+  list.forEach((e) => {
+    if (seen.has(e.name)) return;
+    seen.add(e.name);
+    evalOptions += `<option value="${e.name}">${e.name}</option>`;
+  });
   evalSel.innerHTML = evalOptions;
-  if (prevEvalValue && (prevEvalValue === selfName || list.some((e) => e.name === prevEvalValue))) {
+
+  const defaultEval = sicNames.includes(selfName) ? selfName : (sicNames[0] || selfName);
+  if (prevEvalValue && (seen.has(prevEvalValue))) {
     evalSel.value = prevEvalValue;
   } else {
-    evalSel.value = selfName;
+    evalSel.value = defaultEval;
   }
 }
 

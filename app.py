@@ -564,6 +564,22 @@ def api_admin_rename_user(user_id):
     return jsonify({"ok": True, "id": user_id, "name": new_name})
 
 
+@app.route("/api/stores/<int:store_id>/sic")
+@login_required
+def api_store_sic(store_id):
+    """Names of the account-holding SIC(s) (store manager/supervisor) assigned
+    to this store, so the Role Play observer field can default to them."""
+    db = get_db()
+    rows = db.execute(
+        """SELECT DISTINCT u.name FROM users u
+           JOIN user_stores us ON us.user_id = u.id
+           WHERE us.store_id = ? AND u.role = 'store_manager'
+           ORDER BY u.name""",
+        (store_id,),
+    ).fetchall()
+    return jsonify([r["name"] for r in rows])
+
+
 @app.route("/api/employees")
 @login_required
 def api_employees():
