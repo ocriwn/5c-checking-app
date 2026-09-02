@@ -339,17 +339,20 @@ async function loadStoreEmployees(storeId) {
   if (prevEmpValue && list.some((e) => e.name === prevEmpValue)) empSel.value = prevEmpValue;
   else empSel.value = "";
 
-  // 觀察人：預設代入該店的 SIC（店經理／Supervisor 帳號），若本人就是其中之一
-  // 則優先選自己；也可從門店員工名單挑選/新增其他人（例如借用帳號登入的 SSA）。
+  // 觀察人：預設代入該店的 SIC（店經理／Supervisor 帳號），若本人是店經理身份
+  // 且就是其中之一則優先選自己；管理員/RM 等非店經理帳號不會自動加入自己
+  // （例如巡店時要記錄自己為觀察人，用「＋新增觀察人」手動加入）。也可從
+  // 門店員工名單挑選/新增其他人（例如借用帳號登入的 SSA）。
   const selfName = state.user.name;
+  const selfIsStoreManager = state.user.role === "store_manager";
   const seen = new Set();
-  let evalOptions = "";
+  let evalOptions = `<option value="">${t("placeholder_evaluator")}</option>`;
   sicNames.forEach((n) => {
     if (seen.has(n)) return;
     seen.add(n);
     evalOptions += `<option value="${n}">${n}</option>`;
   });
-  if (!seen.has(selfName)) {
+  if (selfIsStoreManager && !seen.has(selfName)) {
     seen.add(selfName);
     evalOptions += `<option value="${selfName}">${selfName}</option>`;
   }
@@ -360,8 +363,12 @@ async function loadStoreEmployees(storeId) {
   });
   evalSel.innerHTML = evalOptions;
 
-  const defaultEval = sicNames.includes(selfName) ? selfName : (sicNames[0] || selfName);
-  if (prevEvalValue && (seen.has(prevEvalValue))) {
+  let defaultEval = "";
+  if (sicNames.includes(selfName)) defaultEval = selfName;
+  else if (sicNames.length) defaultEval = sicNames[0];
+  else if (selfIsStoreManager) defaultEval = selfName;
+
+  if (prevEvalValue && seen.has(prevEvalValue)) {
     evalSel.value = prevEvalValue;
   } else {
     evalSel.value = defaultEval;
@@ -453,7 +460,7 @@ function collectItems() {
   return items;
 }
 
-function resetScoreForm() {
+async function resetScoreForm() {
   document.querySelectorAll('#categories-container input[type=checkbox]').forEach((b) => {
     b.checked = false;
     b.disabled = false;
@@ -466,7 +473,7 @@ function resetScoreForm() {
   document.querySelectorAll('#feelings-options input').forEach((b) => (b.checked = false));
   document.getElementById("f-overall-feedback").value = "";
   document.getElementById("f-employee").value = "";
-  document.getElementById("f-evaluator").value = state.user.name;
+  await loadStoreEmployees(document.getElementById("f-store").value);
   updateTotals();
 }
 
