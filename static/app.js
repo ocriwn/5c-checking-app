@@ -383,13 +383,26 @@ function toggleNewEmployeeRow(show) {
   else document.getElementById("new-employee-name").value = "";
 }
 
+function ensureOptionAndSelect(selectEl, name) {
+  if (!Array.from(selectEl.options).some((o) => o.value === name)) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    selectEl.appendChild(opt);
+  }
+  selectEl.value = name;
+}
+
 async function handleConfirmAddEmployee() {
   const name = document.getElementById("new-employee-name").value.trim();
   const storeId = document.getElementById("f-store").value;
   if (!name || !storeId) return;
   await api("/api/store-employees", { method: "POST", body: JSON.stringify({ store_id: storeId, name }) });
   await loadStoreEmployees(storeId);
-  document.getElementById("f-employee").value = name;
+  // GET is view-scoped, so for a cross-store submission the refreshed list
+  // may come back empty even though the POST above succeeded — make sure
+  // the name just typed is still selectable regardless.
+  ensureOptionAndSelect(document.getElementById("f-employee"), name);
   toggleNewEmployeeRow(false);
 }
 
@@ -418,7 +431,7 @@ async function handleConfirmAddEvaluator() {
   if (!name || !storeId) return;
   await api("/api/store-employees", { method: "POST", body: JSON.stringify({ store_id: storeId, name }) });
   await loadStoreEmployees(storeId);
-  document.getElementById("f-evaluator").value = name;
+  ensureOptionAndSelect(document.getElementById("f-evaluator"), name);
   toggleNewEvaluatorRow(false);
 }
 

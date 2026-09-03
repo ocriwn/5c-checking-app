@@ -568,8 +568,13 @@ def api_admin_rename_user(user_id):
 @login_required
 def api_store_sic(store_id):
     """Names of the account-holding SIC(s) (store manager/supervisor) assigned
-    to this store, so the Role Play observer field can default to them."""
+    to this store, so the Role Play observer field can default to them.
+    View-scoped: a store manager only sees this for their own store(s), not
+    other stores in the region they're merely allowed to submit scores for."""
     db = get_db()
+    allowed = view_scope_store_ids(g.user)
+    if allowed is not None and store_id not in allowed:
+        return jsonify([])
     rows = db.execute(
         """SELECT DISTINCT u.name FROM users u
            JOIN user_stores us ON us.user_id = u.id
@@ -610,13 +615,17 @@ def api_evaluators():
 @app.route("/api/store-employees", methods=["GET", "POST"])
 @login_required
 def api_store_employees():
+    """GET is view-scoped (own store only) so a store manager can't browse
+    another store's roster just by picking it in the cross-store submit
+    range; POST/DELETE stay submit-scoped (region-wide) so they can still
+    type in a name while scoring a peer store."""
     db = get_db()
     store_id = request.args.get("store_id") if request.method == "GET" else (request.json or {}).get("store_id")
     if not store_id:
         return jsonify({"error": "缺少門店"}), 400
     store_id = int(store_id)
-    allowed = submit_scope_store_ids(g.user)
-    if allowed is not None and store_id not in allowed:
+    submit_allowed = submit_scope_store_ids(g.user)
+    if submit_allowed is not None and store_id not in submit_allowed:
         return jsonify({"error": "沒有權限", "code": "forbidden"}), 403
 
     if request.method == "POST":
@@ -628,6 +637,10 @@ def api_store_employees():
             (store_id, name, datetime.now().isoformat(timespec="seconds")),
         )
         db.commit()
+
+    view_allowed = view_scope_store_ids(g.user)
+    if view_allowed is not None and store_id not in view_allowed:
+        return jsonify([])
 
     rows = db.execute(
         "SELECT id, name FROM store_employees WHERE store_id = ? ORDER BY name", (store_id,)
