@@ -392,13 +392,23 @@ def api_me():
     return jsonify(user_public(user) if user else None)
 
 
-@app.route("/api/admin/users", methods=["POST"])
+@app.route("/api/admin/users", methods=["GET", "POST"])
 @admin_required
 def api_admin_add_user():
-    """Admin-only: create or update a store_manager/rm/admin account.
-    Region/store are created on the fly by name if they don't exist yet,
-    so this one call is enough for "add manager X at stores [Y,Z] in region W".
-    store_names may list more than one store (cluster/area managers)."""
+    """GET: list all accounts (with ids, for admin scripts). POST: create or
+    update a store_manager/rm/admin account. Region/store are created on the
+    fly by name if they don't exist yet, so this one call is enough for
+    "add manager X at stores [Y,Z] in region W". store_names may list more
+    than one store (cluster/area managers)."""
+    if request.method == "GET":
+        db = get_db()
+        rows = db.execute(
+            """SELECT u.id, u.name, u.role, u.title_group, u.home_store_id, u.region_id,
+                      r.name AS region_name
+               FROM users u LEFT JOIN regions r ON r.id = u.region_id
+               ORDER BY u.name"""
+        ).fetchall()
+        return jsonify([dict(r) for r in rows])
     db = get_db()
     payload = request.json or {}
     name = (payload.get("name") or "").strip()
