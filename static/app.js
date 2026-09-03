@@ -339,10 +339,11 @@ async function loadStoreEmployees(storeId) {
   if (prevEmpValue && list.some((e) => e.name === prevEmpValue)) empSel.value = prevEmpValue;
   else empSel.value = "";
 
-  // 觀察人：預設代入該店的 SIC（店經理／Supervisor 帳號），若本人是店經理身份
+  // 觀察人：只列出該店的 SIC（店經理／Supervisor 帳號），若本人是店經理身份
   // 且就是其中之一則優先選自己；管理員/RM 等非店經理帳號不會自動加入自己
-  // （例如巡店時要記錄自己為觀察人，用「＋新增觀察人」手動加入）。也可從
-  // 門店員工名單挑選/新增其他人（例如借用帳號登入的 SSA）。
+  // （例如巡店時要記錄自己為觀察人，用「＋新增觀察人」手動加入）。一般員工
+  // (SA/SSA) 不會自動列在這裡，但仍可用「＋新增觀察人」手動輸入（例如借用
+  // 帳號登入的 SSA），只是不會像 SIC 一樣自動代入。
   const selfName = state.user.name;
   const selfIsStoreManager = state.user.role === "store_manager";
   const seen = new Set();
@@ -356,11 +357,6 @@ async function loadStoreEmployees(storeId) {
     seen.add(selfName);
     evalOptions += `<option value="${selfName}">${selfName}</option>`;
   }
-  list.forEach((e) => {
-    if (seen.has(e.name)) return;
-    seen.add(e.name);
-    evalOptions += `<option value="${e.name}">${e.name}</option>`;
-  });
   evalSel.innerHTML = evalOptions;
 
   let defaultEval = "";
